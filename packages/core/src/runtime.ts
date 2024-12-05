@@ -1021,14 +1021,14 @@ Text: ${attachment.text}
                           })
                           .join("")
                     : "",
-            characterPostExamples:
+            /*characterPostExamples:
                 formattedCharacterPostExamples &&
                 formattedCharacterPostExamples.replaceAll("\n", "").length > 0
                     ? addHeader(
                           `# Example Posts for ${this.character.name}`,
                           formattedCharacterPostExamples
                       )
-                    : "",
+                    : "",*/
             characterMessageExamples:
                 formattedCharacterMessageExamples &&
                 formattedCharacterMessageExamples.replaceAll("\n", "").length >
@@ -1052,7 +1052,7 @@ Text: ${attachment.text}
                     : "",
 
             postDirections:
-                this.character?.style?.all?.length > 0 ||
+                /*this.character?.style?.all?.length > 0 ||
                 this.character?.style?.post.length > 0
                     ? addHeader(
                           "# Post Directions for " + this.character.name,
@@ -1062,7 +1062,8 @@ Text: ${attachment.text}
                               return [...all, ...post].join("\n");
                           })()
                       )
-                    : "",
+                    : "",*/
+                "",
 
             //old logic left in for reference
             //food for thought. how could we dynamically decide what parts of the character to add to the prompt other than random? rag? prompt the llm to decide?
@@ -1093,26 +1094,29 @@ Text: ${attachment.text}
             actorsData,
             roomId,
             goals:
-                goals && goals.length > 0
+                /*goals && goals.length > 0
                     ? addHeader(
                           "# Goals\n{{agentName}} should prioritize accomplishing the objectives that are in progress.",
                           goals
                       )
-                    : "",
+                    : "",*/
+                "",
             goalsData,
             recentMessages:
                 recentMessages && recentMessages.length > 0
                     ? addHeader("# Conversation Messages", recentMessages)
                     : "",
             recentPosts:
-                recentPosts && recentPosts.length > 0
+                /*recentPosts && recentPosts.length > 0
                     ? addHeader("# Posts in Thread", recentPosts)
-                    : "",
+                    : "",*/
+                "",
             recentMessagesData,
             attachments:
-                formattedAttachments && formattedAttachments.length > 0
+                /*formattedAttachments && formattedAttachments.length > 0
                     ? addHeader("# Attachments", formattedAttachments)
-                    : "",
+                    : "",*/
+                "",
             ...additionalKeys,
         } as State;
 

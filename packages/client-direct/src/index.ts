@@ -14,6 +14,7 @@ import {
     Client,
     IAgentRuntime,
 } from "@ai16z/eliza";
+import { TokenDataProvider } from "@ai16z/plugin-data-enrich";
 import { stringToUuid } from "@ai16z/eliza";
 import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
@@ -271,6 +272,68 @@ export class DirectClient {
                     }
                 }
                 res.json({ images: imagesRes });
+            }
+        );
+
+        // Watcher
+        this.app.post(
+            "/:agentId/watcher",
+            async (req: express.Request, res: express.Response) => {
+                const agentId = req.params.agentId;
+                const roomId = stringToUuid(
+                    req.body.roomId ?? "default-room-" + agentId
+                );
+                const userId = stringToUuid(req.body.userId ?? "user");
+
+                let runtime = this.agents.get(agentId);
+
+                // if runtime is null, look for runtime with the same name
+                if (!runtime) {
+                    runtime = Array.from(this.agents.values()).find(
+                        (a) => a.character.name.toLowerCase() ===
+                            agentId.toLowerCase()
+                    );
+                }
+
+                if (!runtime) {
+                    res.status(404).send("Agent not found");
+                    return;
+                }
+
+                await runtime.ensureConnection(
+                    userId,
+                    roomId,
+                    req.body.userName,
+                    req.body.name,
+                    "direct"
+                );
+
+                if (req.body.request == "latest_report") {
+                    let cache: string = await runtime.cacheManager.get(path.join("twitter_watcher_data", "001"));
+                    console.log(cache);
+                    let json = JSON.parse(cache);
+                    if (!json) {
+                        res.status(200).send("Watcher is working, please wait.");
+                        return;
+                    }
+                    else {
+                        res.json(json);
+                    }
+                }
+                else if (req.body.request == "single_report") {
+                    let report = "{}";
+                    try {
+                        const provider = new TokenDataProvider(runtime.cacheManager);
+                        let tokenSymbol = req.body.text;
+                        report = await provider.getFormattedTokenSecurityReport(tokenSymbol);
+                    } catch (error) {
+                        console.error("Error fetching token data:", error);
+                    }
+                    res.json(report);
+                }
+                else {
+                    res.status(404).send("Request not found");
+                }
             }
         );
 
