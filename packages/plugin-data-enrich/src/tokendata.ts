@@ -4,13 +4,45 @@ import * as path from "path";
 
 
 // Pre Defined TOP Token
-export const TOP_TOKEN = [
+export const TOP_TOKENS = [
     "BTC",
     "ETH",
     "SOL",
     "BNB",
     "DOT",
+    "Bitcoin",
 ];
+
+export const tokenWatcherConversationTemplate =
+    // {{goals}}
+    `# Action Examples
+{{actionExamples}}
+(Action examples are for reference only. Do not use the information from them in your response.)
+
+# Knowledge
+{{knowledge}}
+
+# Task: Generate dialog and actions for the character {{agentName}}.
+About {{agentName}}:
+{{bio}}
+{{lore}}
+
+{{providers}}
+
+{{attachments}}
+
+# Capabilities
+Note that {{agentName}} is capable of reading/analysis various forms of text, including HTML, plaintext and PDFs. Recent attachments have been included above under the "Attachments" section.
+
+{{messageDirections}}
+
+{{recentMessages}}
+
+{{actions}}
+
+# Instructions:
+  Please answer the questions by the input, and also append some Web3/Token/Coin hot topic that related to the questions.
+`;
 
 const PROVIDER_CONFIG = {
     BIRDEYE_API: "https://public-api.birdeye.so",
@@ -27,6 +59,14 @@ export interface TokenSecurityData {
     creatorPercentage: number;
     top10HolderBalance: string;
     top10HolderPercent: number;
+}
+
+export const topTokenProvider: Provider = {
+    get: async (_runtime: IAgentRuntime, _message: Memory, _state?: State) => {
+
+        return `The Top/Famous Token List is ${TOP_TOKENS},
+                Please use this as your reference for any twitter-based operations or responses.`;
+    },
 }
 
 export class TokenDataProvider {

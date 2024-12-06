@@ -9,7 +9,12 @@ import {
 } from "@ai16z/eliza";
 
 import { socialProvider, TW_KOL_1, TW_KOL_2, TW_KOL_3 } from "./social.ts";
-import { TokenDataProvider } from "./tokendata.ts";
+import {
+    TOP_TOKENS,
+    topTokenProvider,
+    TokenDataProvider,
+    tokenWatcherConversationTemplate
+} from "./tokendata.ts";
 
 
 const dataEnrich: Action = {
@@ -27,9 +32,7 @@ const dataEnrich: Action = {
     description:
         "Perform a web search to find information related to the message.",
     validate: async (runtime: IAgentRuntime, message: Memory) => {
-        const tavilyApiKeyOk = !!runtime.getSetting("TAVILY_API_KEY");
-
-        return tavilyApiKeyOk;
+        return true;
     },
     handler: async (
         runtime: IAgentRuntime,
@@ -44,7 +47,7 @@ const dataEnrich: Action = {
         elizaLogger.log("User ID:", userId);
 
         const webSearchPrompt = message.content.text;
-        elizaLogger.log("web search prompt received:", webSearchPrompt);
+        elizaLogger.log("Data-enrich prompt received:", webSearchPrompt);
 
     },
     examples: [
@@ -56,7 +59,12 @@ export const dataEnrichPlugin: Plugin = {
     description: "Query detail info by API/DB",
     actions: [dataEnrich],
     evaluators: [],
-    providers: [socialProvider],
+    providers: [socialProvider, topTokenProvider],
 };
 
-export { socialProvider, TokenDataProvider, TW_KOL_1, TW_KOL_2, TW_KOL_3 };
+export {
+    socialProvider,
+    TOP_TOKENS, TokenDataProvider,
+    tokenWatcherConversationTemplate,
+    TW_KOL_1, TW_KOL_2, TW_KOL_3
+};

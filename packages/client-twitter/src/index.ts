@@ -20,6 +20,7 @@ class TwitterManager {
         // burns your rate limit and can get your account banned
         // use at your own risk
         //this.interaction = new TwitterInteractionClient(this.client, runtime);
+        this.watcher = new TwitterWatchClient(this.client, runtime);
     }
 }
 

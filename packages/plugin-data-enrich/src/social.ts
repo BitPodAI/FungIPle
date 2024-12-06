@@ -1,12 +1,5 @@
 import { IAgentRuntime, Memory, Provider, State } from "@ai16z/eliza";
 import { Scraper } from "agent-twitter-client";
-import { messageCompletionFooter } from "@ai16z/eliza";
-import dotenv from "dotenv";
-//import fs from "fs";
-
-dotenv.config();
-
-const TWEETS_FILE = "tweets.json";
 
 // Pre Defined Twitter KOL
 export const TW_KOL_1 = [
@@ -32,7 +25,6 @@ export const TW_KOL_3 = [
 
 export const socialProvider: Provider = {
     get: async (_runtime: IAgentRuntime, _message: Memory, _state?: State) => {
-        const currentDate = new Date();
 
         return `The Twitter KOL List Category 1 is ${TW_KOL_1},
                 The Twitter KOL List Category 2 is ${TW_KOL_2},
