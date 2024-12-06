@@ -1,5 +1,6 @@
 import { IAgentRuntime, Memory, Provider, State } from "@ai16z/eliza";
 import { ICacheManager, settings } from "@ai16z/eliza";
+import { messageCompletionFooter } from "@ai16z/eliza";
 import * as path from "path";
 
 
@@ -15,34 +16,10 @@ export const TOP_TOKENS = [
 
 export const tokenWatcherConversationTemplate =
     // {{goals}}
-    `# Action Examples
-{{actionExamples}}
-(Action examples are for reference only. Do not use the information from them in your response.)
-
-# Knowledge
-{{knowledge}}
-
-# Task: Generate dialog and actions for the character {{agentName}}.
-About {{agentName}}:
-{{bio}}
-{{lore}}
-
-{{providers}}
-
-{{attachments}}
-
-# Capabilities
-Note that {{agentName}} is capable of reading/analysis various forms of text, including HTML, plaintext and PDFs. Recent attachments have been included above under the "Attachments" section.
-
-{{messageDirections}}
-
-{{recentMessages}}
-
-{{actions}}
-
+    `
 # Instructions:
-  Please answer the questions by the input, and also append some Web3/Token/Coin hot topic that related to the questions.
-`;
+  Please response the input message, and also append some Web3/Token/Coin hot topic that related to the input for {{agentName}}.
+`  + messageCompletionFooter;
 
 const PROVIDER_CONFIG = {
     BIRDEYE_API: "https://public-api.birdeye.so",

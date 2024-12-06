@@ -6,6 +6,10 @@ export const TW_KOL_1 = [
     "@jessepollak",
     "@elonmusk",
     "@cz_binance",
+    "@0xRodney",
+    "@Buddy",
+    "@DavidAirey",
+    "@alex_fazel",
 ];
 
 export const TW_KOL_2 = [
@@ -13,6 +17,11 @@ export const TW_KOL_2 = [
     "@heyibinance",
     "@CryptoHayes",
     "@rajgokal",
+    "@CryptoDaku_",
+    "@healthy_pockets",
+    "@StackerSatoshi",
+    "@TheCryptoLark",
+    "@CryptoTony__",
 ];
 
 export const TW_KOL_3 = [
@@ -20,6 +29,10 @@ export const TW_KOL_3 = [
     "@therealchaseeb",
     "@jacobvcreech",
     "@gavofyork",
+    "@lordjorx",
+    "@Haskell_Gz",
+    "@Overdose_AI",
+    "@KriptoErs",
 ];
 
 

@@ -58,10 +58,10 @@ export class TwitterSearchClient extends ClientBase {
 
     private engageWithSearchTermsLoop() {
         this.engageWithSearchTerms();
-        setTimeout(
-            () => this.engageWithSearchTermsLoop(),
-            (Math.floor(Math.random() * (120 - 60 + 1)) + 60) * 60 * 1000
-        );
+        //setTimeout(
+        //    () => this.engageWithSearchTermsLoop(),
+        //    (Math.floor(Math.random() * (120 - 60 + 1)) + 60) * 60 * 1000
+        //);
     }
 
     private async engageWithSearchTerms() {

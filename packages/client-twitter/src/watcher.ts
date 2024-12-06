@@ -110,10 +110,8 @@ export class TwitterWatchClient {
                     this.runtime.getSetting("TWITTER_USERNAME") +
                     "/lastGen"
             );
-            console.log(lastGen);
 
             const lastGenTimestamp = lastGen?.timestamp ?? 0;
-            console.log(lastGenTimestamp);
             if (Date.now() > lastGenTimestamp + GEN_TOKEN_REPORT_DELAY) {
                 await this.fetchTokens();
             }
@@ -135,7 +133,7 @@ export class TwitterWatchClient {
             const currentTime = new Date();
             const timeline = Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
             for (const kolList of [TW_KOL_1, TW_KOL_2, TW_KOL_3]) {
-                let twText = "";
+                //let twText = "";
                 let kolTweets = [];
                 for (const kol of kolList) {
                     //console.log(kol.substring(1));
@@ -146,11 +144,10 @@ export class TwitterWatchClient {
                             continue; // Skip the outdates.
                         }
                         kolTweets.push(tweet);
-                        twText = twText.concat("START_OF_TWEET_TEXT: [" + tweet.text + "] END_OF_TWEET_TEXT");
+                        //twText = twText.concat("START_OF_TWEET_TEXT: [" + tweet.text + "] END_OF_TWEET_TEXT");
                     }
                 }
-                console.log(twText.length);
-
+                //console.log(twText.length);
 
                 const prompt = `
                 Here are some tweets/replied:
@@ -169,10 +166,13 @@ export class TwitterWatchClient {
                     Text: ${tweet.text}`
                 ).join("\n")}
             
-Please find the token/project involved according to the text provided, and obtain the data of the number of interactions between each token and the three types of accounts (mentions/likes/comments/reposts/posts) in the tweets related to these tokens; mark the tokens as category 1, category 2 or category 3; if there are both category 1 and category 2, choose category 1, which has a higher priority. Please reply in Chinese and in the following format:
+Please find the token/project involved according to the text provided, and obtain the data of the number of interactions between each token and the three category of accounts (mentions/likes/comments/reposts/posts) in the tweets related to these tokens; mark the tokens as category 1, category 2 or category 3; if there are both category 1 and category 2, choose category 1, which has a higher priority.
+ And provide the brief introduction of the key event for each token. And also skip the top/famous tokens.
+Please reply in Chinese and in the following format:
 - Token Symbol by json name 'token';
 - Token Interaction Category by json name 'category';
 - Token Interaction Count by json name 'count';
+- Token Key Event Introduction by json name 'event';
 Use the list format and only provide these 3 pieces of information.`
  + watcherCompletionFooter;
 
@@ -181,11 +181,9 @@ Use the list format and only provide these 3 pieces of information.`
                     context: prompt,
                     modelClass: ModelClass.MEDIUM,
                 });
-                console.log(response);
                 response = response.replaceAll("```", "");
                 response = response.replace("json", "");
                 let jsonArray = JSON.parse(response);
-                console.log(jsonArray);
                 if (jsonArray) {
                     // Merge results
                     jsonArray.forEach(item => {

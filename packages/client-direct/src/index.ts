@@ -4,7 +4,7 @@ import express, { Request as ExpressRequest } from "express";
 import multer, { File } from "multer";
 import { elizaLogger, generateCaption, generateImage } from "@ai16z/eliza";
 import { composeContext } from "@ai16z/eliza";
-import { generateMessageResponse } from "@ai16z/eliza";
+import { generateMessageResponse, generateText } from "@ai16z/eliza";
 import { messageCompletionFooter } from "@ai16z/eliza";
 import { AgentRuntime } from "@ai16z/eliza";
 import {
@@ -332,58 +332,16 @@ export class DirectClient {
                     res.json(report);
                 }
                 else if (req.body.request == "token_chat") {
-                    let responseMessage = "{}";
                     try {
-                        const text = req.body.text;
-                        const messageId = stringToUuid(Date.now().toString());
-                        const content: Content = {
-                            text,
-                            attachments: [],
-                            source: "direct",
-                            inReplyTo: undefined,
-                        };
+                        const prompt = `Here are user input content:
+                            ${req.body.text}`
+                            + tokenWatcherConversationTemplate;
 
-                        const userMessage = {
-                            content,
-                            userId,
-                            roomId,
-                            agentId: runtime.agentId,
-                        };
-
-                        const memory: Memory = {
-                            id: messageId,
-                            agentId: runtime.agentId,
-                            userId,
-                            roomId,
-                            content,
-                            createdAt: Date.now(),
-                        };
-
-                        await runtime.messageManager.createMemory(memory);
-
-                        const state = await runtime.composeState(userMessage, {
-                            agentName: runtime.character.name,
-                        });
-
-                        const context = composeContext({
-                            state,
-                            template: tokenWatcherConversationTemplate,
-                        });
-
-                        const response = await generateMessageResponse({
+                        let response = await generateText({
                             runtime: runtime,
-                            context,
+                            context: prompt,
                             modelClass: ModelClass.SMALL,
                         });
-
-                        // save response to memory
-                        const responseMessage = {
-                            ...userMessage,
-                            userId: runtime.agentId,
-                            content: response,
-                        };
-
-                        await runtime.messageManager.createMemory(responseMessage);
 
                         if (!response) {
                             res.status(500).send(
@@ -391,30 +349,14 @@ export class DirectClient {
                             );
                             return;
                         }
+                        response = response.replaceAll("```", "");
+                        response = response.replace("json", "");
 
-                        let message = null as Content | null;
-
-                        await runtime.evaluate(memory, state);
-
-                        const _result = await runtime.processActions(
-                            memory,
-                            [responseMessage],
-                            state,
-                            async (newMessages) => {
-                                message = newMessages;
-                                return [memory];
-                            }
-                        );
-
-                        if (message) {
-                            res.json([response, message]);
-                        } else {
-                            res.json([response]);
-                        }
+                        res.json([response]);
                     } catch (error) {
                         console.error("Error response token question: ", error);
+                        res.status(200).send("Response with error");
                     }
-                    res.json(responseMessage);
                 }
                 else {
                     res.status(404).send("Request not found");
