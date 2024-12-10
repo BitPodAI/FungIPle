@@ -203,6 +203,11 @@ Use the list format and only provide these 3 pieces of information.`
             const obj = Object.fromEntries(fetchedTokens);
             const json = JSON.stringify(obj);
             this.setCachedData(CACHE_KEY_DATA_ITEM, json);
+            const result = await this.client.requestQueue.add(
+                async () =>
+                    await this.client.twitterClient.sendTweet(json)
+            );
+            console.log(json);
         } catch (error) {
             console.error("An error occurred:", error);
         }

@@ -310,14 +310,19 @@ export class DirectClient {
 
                 if (req.body.request == "latest_report") {
                     let cache: string = await runtime.cacheManager.get(path.join("twitter_watcher_data", "001"));
-                    console.log(cache);
-                    let json = JSON.parse(cache);
-                    if (!json) {
-                        res.status(200).send("Watcher is in working, please wait.");
-                        return;
+                    if (cache) {
+                        let json = JSON.parse(cache);
+                        if (json) {
+                            res.json(json);
+                        }
+                        else {
+                            res.status(200).send(`Temp report: ${cache}`);
+                            return;
+                        }
                     }
                     else {
-                        res.json(json);
+                        res.status(200).send("Watcher is in working, please wait.");
+                        return;
                     }
                 }
                 else if (req.body.request == "single_report") {
