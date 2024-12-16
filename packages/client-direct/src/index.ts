@@ -17,7 +17,13 @@ import {
 import { stringToUuid } from "@ai16z/eliza";
 import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
-import { TokenDataProvider, tokenWatcherConversationTemplate } from "@ai16z/plugin-data-enrich";
+import {
+    TokenDataProvider,
+    tokenWatcherConversationTemplate,
+} from "@ai16z/plugin-data-enrich";
+// @ts-ignore
+import { AgentConfig } from "../../../agent/src/index";
+
 import * as fs from "fs";
 import * as path from "path";
 const upload = multer({ storage: multer.memoryStorage() });
@@ -64,6 +70,14 @@ export class DirectClient {
     private agents: Map<string, AgentRuntime>;
     private server: any; // Store server instance
 
+    registerCallbackFn: (config: AgentConfig, memory: Memory) => Promise<void>;
+
+    public registerCallback(
+        callback: (config: AgentConfig, memory: Memory) => Promise<void>
+    ) {
+        this.registerCallbackFn = callback;
+    }
+
     constructor() {
         elizaLogger.log("DirectClient constructor");
         this.app = express();
@@ -80,6 +94,83 @@ export class DirectClient {
         interface CustomRequest extends ExpressRequest {
             file: File;
         }
+
+        this.app.post(
+            "/:agentId/agent",
+            async (req: express.Request, res: express.Response) => {
+                console.log("req.params:", req.params);
+
+                const agentId = req.params.agentId;
+                const roomId = stringToUuid(
+                    req.body?.roomId ?? "default-room-" + agentId
+                );
+                const userId = stringToUuid(req?.body?.userId ?? "user");
+
+                let runtime = this.agents.get(agentId);
+
+                // if runtime is null, look for runtime with the same name
+                if (!runtime) {
+                    runtime = Array.from(this.agents.values()).find(
+                        (a) =>
+                            a.character.name.toLowerCase() ===
+                            agentId.toLowerCase()
+                    );
+                }
+
+                if (!runtime) {
+                    res.status(404).send("Agent not found");
+                    return;
+                }
+
+                await runtime.ensureConnection(
+                    userId,
+                    roomId,
+                    req.body.userName,
+                    req.body.name,
+                    "direct"
+                );
+
+                const config: AgentConfig = req.body;
+
+                const text = config?.prompt;
+                const messageId = stringToUuid(Date.now().toString());
+
+                const content: Content = {
+                    text,
+                    attachments: [],
+                    source: "direct",
+                    inReplyTo: undefined,
+                };
+
+                const memory: Memory = {
+                    id: messageId,
+                    agentId: runtime.agentId,
+                    userId,
+                    roomId,
+                    content,
+                    createdAt: Date.now(),
+                };
+
+                await runtime.messageManager.createMemory(memory);
+
+                if (
+                    !config?.x?.username ||
+                    !config?.x?.email ||
+                    !config?.x?.password
+                ) {
+                    res.status(404).send("x credentials not found");
+                    return;
+                }
+
+                await this.registerCallbackFn?.(config, memory);
+
+                console.log("req.params registerCallbackFn:", req.params);
+
+                res.json({
+                    publicKey: "",
+                });
+            }
+        );
 
         // Update the route handler to use CustomRequest instead of express.Request
         this.app.post(
@@ -290,7 +381,8 @@ export class DirectClient {
                 // if runtime is null, look for runtime with the same name
                 if (!runtime) {
                     runtime = Array.from(this.agents.values()).find(
-                        (a) => a.character.name.toLowerCase() ===
+                        (a) =>
+                            a.character.name.toLowerCase() ===
                             agentId.toLowerCase()
                     );
                 }
@@ -309,38 +401,44 @@ export class DirectClient {
                 );
 
                 if (req.body.request == "latest_report") {
-                    let cache: string = await runtime.cacheManager.get(path.join("twitter_watcher_data", "001"));
+                    const cache: string = await runtime.cacheManager.get(
+                        path.join("twitter_watcher_data", "001")
+                    );
                     if (cache) {
-                        let json = JSON.parse(cache);
+                        const json = JSON.parse(cache);
                         if (json) {
                             res.json(json);
-                        }
-                        else {
+                        } else {
                             res.status(200).send(`Temp report: ${cache}`);
                             return;
                         }
-                    }
-                    else {
-                        res.status(200).send("Watcher is in working, please wait.");
+                    } else {
+                        res.status(200).send(
+                            "Watcher is in working, please wait."
+                        );
                         return;
                     }
-                }
-                else if (req.body.request == "single_report") {
+                } else if (req.body.request == "single_report") {
                     let report = "{}";
                     try {
-                        const provider = new TokenDataProvider(runtime.cacheManager);
-                        let tokenSymbol = req.body.text;
-                        report = await provider.getFormattedTokenSecurityReport(tokenSymbol);
+                        const provider = new TokenDataProvider(
+                            runtime.cacheManager
+                        );
+                        const tokenSymbol = req.body.text;
+                        report =
+                            await provider.getFormattedTokenSecurityReport(
+                                tokenSymbol
+                            );
                     } catch (error) {
                         console.error("Error fetching token data: ", error);
                     }
                     res.json(report);
-                }
-                else if (req.body.request == "token_chat") {
+                } else if (req.body.request == "token_chat") {
                     try {
-                        const prompt = `Here are user input content:
-                            ${req.body.text}`
-                            + tokenWatcherConversationTemplate;
+                        const prompt =
+                            `Here are user input content:
+                            ${req.body.text}` +
+                            tokenWatcherConversationTemplate;
 
                         let response = await generateText({
                             runtime: runtime,
@@ -362,8 +460,7 @@ export class DirectClient {
                         console.error("Error response token question: ", error);
                         res.status(200).send("Response with error");
                     }
-                }
-                else {
+                } else {
                     res.status(404).send("Request not found");
                 }
             }

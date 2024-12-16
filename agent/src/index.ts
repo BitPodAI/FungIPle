@@ -16,6 +16,7 @@ import {
     ICacheManager,
     IDatabaseAdapter,
     IDatabaseCacheAdapter,
+    Memory,
     ModelProviderName,
     defaultCharacter,
     elizaLogger,
@@ -47,6 +48,29 @@ import path from "path";
 import readline from "readline";
 import { fileURLToPath } from "url";
 import yargs from "yargs";
+
+export interface AgentConfig {
+    prompt: string;
+    name: string;
+    clients: string[];
+    modelProvider: string;
+    bio: string[];
+    lore?: string[];
+    knowledge?: string[];
+    topics?: string[];
+    style?: {
+        all: string[];
+        chat: string[];
+        post: string[];
+    };
+    adjectives?: string[];
+    x: {
+        username: string;
+        email: string;
+        password: string;
+    };
+    publicKey?: string; // Add publicKey to AgentConfig
+}
 
 const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
 const __dirname = path.dirname(__filename); // get the name of the directory
@@ -419,7 +443,12 @@ function intializeDbCache(character: Character, db: IDatabaseCacheAdapter) {
     return cache;
 }
 
-async function startAgent(character: Character, directClient) {
+async function startAgent(
+    character: Character,
+    directClient,
+    config?: AgentConfig,
+    memory?: Memory
+) {
     let db: IDatabaseAdapter & IDatabaseCacheAdapter;
     try {
         character.id ??= stringToUuid(character.name);
@@ -436,12 +465,18 @@ async function startAgent(character: Character, directClient) {
             IDatabaseCacheAdapter;
 
         await db.init();
+        db.setCache({
+            agentId: character.id,
+            key: "agentConfig",
+            value: JSON.stringify(config),
+        });
 
         const cache = intializeDbCache(character, db);
         const runtime = createAgent(character, db, cache, token);
 
         await runtime.initialize();
 
+        // 初始化 agent client
         const clients = await initializeClients(character, runtime);
 
         directClient.registerAgent(runtime);
@@ -471,6 +506,79 @@ const startAgents = async () => {
     if (charactersArg) {
         characters = await loadCharacters(charactersArg);
     }
+
+    // @ts-ignore
+    directClient.registerCallback(
+        async (config: AgentConfig, memory: Memory) => {
+            // 动态启动 Agent
+            const characters0 = characters?.[0];
+
+            // 需要处理的字段列表
+            const arrayFields = [
+                "bio",
+                "lore",
+                "style",
+                "knowledge",
+                "adjectives",
+            ] as const;
+
+            // 统一处理数组字段
+            arrayFields.forEach((field) => {
+                const value = config?.[field];
+                if (field === "style") {
+                    // 特殊处理 style 字段
+                    let styles: string[] = [];
+                    if (typeof value === "string") {
+                        styles = value
+                            // @ts-ignore
+                            ?.split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                    } else if (Array.isArray(value)) {
+                        styles = value.filter(Boolean);
+                    }
+                    if (styles.length > 0) {
+                        characters0[field] = {
+                            all: styles,
+                            chat: styles,
+                            post: styles,
+                        };
+                    }
+                } else {
+                    // 处理其他数组字段
+                    if (value && typeof value === "string") {
+                        // 处理非空字符串
+                        // @ts-ignore
+                        const trimmed = value?.trim();
+                        if (trimmed) {
+                            characters0[field] = trimmed
+                                .split(",")
+                                .map((str) => str.trim())
+                                .filter(Boolean);
+                        }
+                    } else if (Array.isArray(value)) {
+                        // 处理数组，过滤掉空值
+                        characters0[field] = value.filter(Boolean);
+                    }
+                }
+            });
+
+            // 处理普通字段
+            if (config?.name) {
+                characters0.name = config.name || config.x.username;
+            }
+
+            const character = {
+                ...characters?.[0],
+                // 排除 Twitter 凭证
+                x: undefined,
+            };
+
+            await startAgent(character, directClient, config, memory);
+
+            console.log("req.params registerCallbackFn character:", character);
+        }
+    );
 
     try {
         for (const character of characters) {
