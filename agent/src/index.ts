@@ -69,7 +69,6 @@ export interface AgentConfig {
         email: string;
         password: string;
     };
-    publicKey?: string; // Add publicKey to AgentConfig
 }
 
 const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
@@ -476,10 +475,10 @@ async function startAgent(
 
         await runtime.initialize();
 
+        directClient.registerAgent(runtime);
+
         // 初始化 agent client
         const clients = await initializeClients(character, runtime);
-
-        directClient.registerAgent(runtime);
 
         return clients;
     } catch (error) {
@@ -511,7 +510,7 @@ const startAgents = async () => {
     directClient.registerCallback(
         async (config: AgentConfig, memory: Memory) => {
             // 动态启动 Agent
-            const characters0 = characters?.[0];
+            const characters0 = { ...characters?.[0] };
 
             // 需要处理的字段列表
             const arrayFields = [
@@ -572,6 +571,14 @@ const startAgents = async () => {
                 ...characters?.[0],
                 // 排除 Twitter 凭证
                 x: undefined,
+            };
+
+            character.settings.secrets = {
+                ...character.settings.secrets,
+                TWITTER_USERNAME: config?.x?.username,
+                TWITTER_PASSWORD: config?.x?.password,
+                TWITTER_EMAIL: config?.x?.email,
+                AGENT_PROMPT: config?.prompt,
             };
 
             await startAgent(character, directClient, config, memory);

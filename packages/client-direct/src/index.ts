@@ -106,6 +106,10 @@ export class DirectClient {
                 );
                 const userId = stringToUuid(req?.body?.userId ?? "user");
 
+                const newAgentId = stringToUuid(
+                    stringToUuid(req?.body?.name ?? "user")
+                );
+
                 let runtime = this.agents.get(agentId);
 
                 // if runtime is null, look for runtime with the same name
@@ -129,6 +133,24 @@ export class DirectClient {
                     req.body.name,
                     "direct"
                 );
+
+                // @ts-ignore
+                // const _agentConfiges = await runtime.databaseAdapter?.getCaches(
+                //     {
+                //         key: "agentConfig",
+                //     }
+                // );
+
+                // @ts-ignore
+                const agentConfig = await runtime.databaseAdapter?.getCache({
+                    agentId: newAgentId,
+                    key: "agentConfig",
+                });
+
+                if (agentConfig) {
+                    res.status(404).send("Agent config found");
+                    return;
+                }
 
                 const config: AgentConfig = req.body;
 

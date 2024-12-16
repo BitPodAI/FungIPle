@@ -1365,6 +1365,25 @@ export class PostgresDatabaseAdapter
         }, "getCache");
     }
 
+    async getCaches(params: { key: string }): Promise<string[] | undefined> {
+        return this.withDatabase(async () => {
+            try {
+                const sql = `SELECT "value"::TEXT FROM cache WHERE "key" = $1`;
+                const { rows } = await this.query<{ value: string }>(sql, [
+                    params.key,
+                ]);
+                return rows.map((row) => row.value);
+            } catch (error) {
+                elizaLogger.error("Error fetching cache", {
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                    key: params.key,
+                });
+                return undefined;
+            }
+        }, "getCaches");
+    }
+
     async setCache(params: {
         key: string;
         agentId: UUID;
