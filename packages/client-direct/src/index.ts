@@ -18,6 +18,7 @@ import { stringToUuid } from "@ai16z/eliza";
 import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
 import {
+    InferMessageProvider,
     TokenDataProvider,
     tokenWatcherConversationTemplate,
 } from "@ai16z/plugin-data-enrich";
@@ -423,18 +424,14 @@ export class DirectClient {
                 );
 
                 if (req.body.request == "latest_report") {
-                    const cache: string = await runtime.cacheManager.get(
-                        path.join("twitter_watcher_data", "001")
-                    );
-                    if (cache) {
-                        const json = JSON.parse(cache);
-                        if (json) {
-                            res.json(json);
-                        } else {
-                            res.status(200).send(`Temp report: ${cache}`);
-                            return;
-                        }
-                    } else {
+                    try {
+                        const provider = new InferMessageProvider(
+                            runtime.cacheManager
+                        );
+                        let report = await provider.getLatestReport();
+                        res.json(report);
+                    } catch (error) {
+                        console.error("Error fetching token data: ", error);
                         res.status(200).send(
                             "Watcher is in working, please wait."
                         );

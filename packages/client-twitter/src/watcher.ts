@@ -1,4 +1,5 @@
 import { TOP_TOKENS, TW_KOL_1, TW_KOL_2, TW_KOL_3 } from "@ai16z/plugin-data-enrich";
+import { ConsensusProvider, InferMessageProvider } from "@ai16z/plugin-data-enrich";
 import {
     ModelClass,
     IAgentRuntime,
@@ -59,12 +60,14 @@ const CACHE_KEY_DATA_ITEM = "001";
 export class TwitterWatchClient {
     client: ClientBase;
     runtime: IAgentRuntime;
+    consensus: ConsensusProvider;
 
     private cacheKey: string = CACHE_KEY_TWITTER_WATCHER;
 
     constructor(client: ClientBase, runtime: IAgentRuntime) {
         this.client = client;
         this.runtime = runtime;
+        this.consensus = new ConsensusProvider(this.runtime);
     }
 
     private async readFromCache<T>(key: string): Promise<T | null> {
@@ -100,6 +103,7 @@ export class TwitterWatchClient {
         if (!this.client.profile) {
             await this.client.init();
         }
+        this.consensus.startNode();
 
         const genReportLoop = async () => {
             console.log("TwitterWatcher loop");
@@ -128,6 +132,7 @@ export class TwitterWatchClient {
     async fetchTokens() {
         //console.log("TwitterWatcher fetchTokens");
         let fetchedTokens = new Map();
+        let inferMsgProvider: InferMessageProvider = new InferMessageProvider(this.runtime.cacheManager);
 
         try {
             const currentTime = new Date();
@@ -181,33 +186,20 @@ Use the list format and only provide these 3 pieces of information.`
                     context: prompt,
                     modelClass: ModelClass.MEDIUM,
                 });
-                response = response.replaceAll("```", "");
-                response = response.replace("json", "");
-                let jsonArray = JSON.parse(response);
-                if (jsonArray) {
-                    // Merge results
-                    jsonArray.forEach(item => {
-                        const existingItem = fetchedTokens.get(item.token);
-                        if (existingItem) {
-                            // Merge category & count
-                            existingItem.category = Math.min(existingItem.category, item.category);
-                            existingItem.count += item.count;
-                        } else {
-                            if (!TOP_TOKENS.includes(item.token)) {
-                                fetchedTokens.set(item.token, { ...item });
-                            }
-                        }
-                    });
-                }
+                await inferMsgProvider.addInferMessage(response);
             }
-            const obj = Object.fromEntries(fetchedTokens);
-            const json = JSON.stringify(obj);
-            this.setCachedData(CACHE_KEY_DATA_ITEM, json);
+
+            // Consensus for All Nodes
+            let report = inferMsgProvider.getLatestReport();
+            await this.consensus.pubMessage(report);
+
+            // Post Tweet of myself
+            let tweet = await inferMsgProvider.getAlphaText();
+            console.log(tweet);
             const result = await this.client.requestQueue.add(
                 async () =>
-                    await this.client.twitterClient.sendTweet(json)
+                    await this.client.twitterClient.sendTweet(tweet)
             );
-            console.log(json);
         } catch (error) {
             console.error("An error occurred:", error);
         }

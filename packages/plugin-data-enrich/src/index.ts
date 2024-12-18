@@ -15,6 +15,12 @@ import {
     TokenDataProvider,
     tokenWatcherConversationTemplate
 } from "./tokendata.ts";
+import {
+    InferMessageProvider
+} from "./infermessage.ts";
+import {
+    ConsensusProvider
+} from "./consensus.ts";
 
 
 const dataEnrich: Action = {
@@ -63,6 +69,8 @@ export const dataEnrichPlugin: Plugin = {
 };
 
 export {
+    ConsensusProvider,
+    InferMessageProvider,
     socialProvider,
     TOP_TOKENS, TokenDataProvider,
     tokenWatcherConversationTemplate,
