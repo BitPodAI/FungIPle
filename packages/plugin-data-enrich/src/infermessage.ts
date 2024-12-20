@@ -18,7 +18,7 @@ interface InferMessage {
 }
 
 export class InferMessageProvider {
-    private cacheKey: string = "data-enrich/infermessage";
+    private static cacheKey: string = "data-enrich/infermessage";
 
     constructor(
         private cacheManager: ICacheManager
@@ -27,13 +27,13 @@ export class InferMessageProvider {
 
     private async readFromCache<T>(key: string): Promise<T | null> {
         const cached = await this.cacheManager.get<T>(
-            path.join(this.cacheKey, key)
+            path.join(InferMessageProvider.cacheKey, key)
         );
         return cached;
     }
 
     private async writeToCache<T>(key: string, data: T): Promise<void> {
-        await this.cacheManager.set(path.join(this.cacheKey, key), data, {
+        await this.cacheManager.set(path.join(InferMessageProvider.cacheKey, key), data, {
             expires: Date.now() + 3 * 24 * 60 * 60 * 1000,
         });
     }
@@ -88,9 +88,11 @@ export class InferMessageProvider {
         }
     }
 
-    async getLatestReport() {
+    static async getLatestReport(cacheManager: ICacheManager) {
         try {
-            const report = await this.getCachedData<InferMessage>(TOKEN_REPORT);
+            const report = await cacheManager.get<InferMessage>(
+                path.join(InferMessageProvider.cacheKey, TOKEN_REPORT)
+            );
             if (report) {
                 try {
                     const json = JSON.stringify(report);

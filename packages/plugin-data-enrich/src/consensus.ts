@@ -48,10 +48,10 @@ export class ConsensusProvider {
     async startNode() {
         // create libp2p node
         this.node = await createLibp2p({
-            transports: [
-                tcp,
-                WS
-            ],
+            addresses: 
+                listen: [`/ip4/0.0.0.0/tcp/${CONSENSUS_PORT}`]
+            },
+            transports: [tcp(), WS()],
             peerDiscovery: [
                 bootstrap({
                     list: [
@@ -71,9 +71,9 @@ export class ConsensusProvider {
         console.log('Node ID:', nodeId.toString());
     
         // port info
-        const listenAddr = `/ip4/0.0.0.0/tcp/${CONSENSUS_PORT}`;
-        this.node.listen(listenAddr);
-        console.log('Listening on address:', listenAddr);
+        //const listenAddr = `/ip4/0.0.0.0/tcp/${CONSENSUS_PORT}`;
+        //this.node.listen(listenAddr);
+        //console.log('Listening on address:', listenAddr);
     
         // join the group
         await this.node.pubsub.subscribe(TOPIC_INFER_MESSAGE, (message) => {

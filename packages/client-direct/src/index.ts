@@ -425,10 +425,7 @@ export class DirectClient {
 
                 if (req.body.request == "latest_report") {
                     try {
-                        const provider = new InferMessageProvider(
-                            runtime.cacheManager
-                        );
-                        let report = await provider.getLatestReport();
+                        let report = await InferMessageProvider.getLatestReport(runtime.cacheManager);
                         res.json(report);
                     } catch (error) {
                         console.error("Error fetching token data: ", error);

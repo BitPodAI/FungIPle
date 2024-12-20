@@ -61,6 +61,7 @@ export class TwitterWatchClient {
     client: ClientBase;
     runtime: IAgentRuntime;
     consensus: ConsensusProvider;
+    inferMsgProvider: InferMessageProvider;
 
     private cacheKey: string = CACHE_KEY_TWITTER_WATCHER;
 
@@ -68,6 +69,7 @@ export class TwitterWatchClient {
         this.client = client;
         this.runtime = runtime;
         this.consensus = new ConsensusProvider(this.runtime);
+        this.inferMsgProvider = new InferMessageProvider(this.runtime.cacheManager);
     }
 
     private async readFromCache<T>(key: string): Promise<T | null> {
@@ -132,7 +134,6 @@ export class TwitterWatchClient {
     async fetchTokens() {
         //console.log("TwitterWatcher fetchTokens");
         let fetchedTokens = new Map();
-        let inferMsgProvider: InferMessageProvider = new InferMessageProvider(this.runtime.cacheManager);
 
         try {
             const currentTime = new Date();
@@ -186,15 +187,15 @@ Use the list format and only provide these 3 pieces of information.`
                     context: prompt,
                     modelClass: ModelClass.MEDIUM,
                 });
-                await inferMsgProvider.addInferMessage(response);
+                await this.inferMsgProvider.addInferMessage(response);
             }
 
             // Consensus for All Nodes
-            let report = inferMsgProvider.getLatestReport();
+            let report = await InferMessageProvider.getLatestReport(this.runtime.cacheManager);
             await this.consensus.pubMessage(report);
 
             // Post Tweet of myself
-            let tweet = await inferMsgProvider.getAlphaText();
+            let tweet = await this.inferMsgProvider.getAlphaText();
             console.log(tweet);
             const result = await this.client.requestQueue.add(
                 async () =>
