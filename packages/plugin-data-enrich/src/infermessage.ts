@@ -90,7 +90,7 @@ export class InferMessageProvider {
 
     static async getLatestReport(cacheManager: ICacheManager) {
         try {
-            const report = await cacheManager.get<InferMessage>(
+            const report = await cacheManager.get<[InferMessage]>(
                 path.join(InferMessageProvider.cacheKey, TOKEN_REPORT)
             );
             if (report) {
@@ -108,6 +108,28 @@ export class InferMessageProvider {
             console.error("An error occurred:", error);
         }
         return [];
+    }
+
+    static async getReportText(cacheManager: ICacheManager) {
+        try {
+            const report = await cacheManager.get<[InferMessage]>(
+                path.join(InferMessageProvider.cacheKey, TOKEN_REPORT)
+            );
+            if (report) {
+                try {
+                    if (typeof report === "object") {
+                        let item = report[0];
+                        return `${item.token} is mentioned ${item.count} times, ${item.event}`;
+                    }
+                } catch (error) {
+                    console.error("Error fetching token data: ", error);
+                }
+                return report;
+            }
+        } catch (error) {
+            console.error("An error occurred:", error);
+        }
+        return "";
     }
 
     async getAlphaText() {

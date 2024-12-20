@@ -35,6 +35,14 @@ export const TW_KOL_3 = [
     "@KriptoErs",
 ];
 
+export const STYLE_LIST = [
+    "professional and rigorous",
+    "humorous",
+    "optimistic and positive",
+    "cautious",
+    "Bold and proactive",
+];
+
 
 export const socialProvider: Provider = {
     get: async (_runtime: IAgentRuntime, _message: Memory, _state?: State) => {

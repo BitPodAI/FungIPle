@@ -18,6 +18,7 @@ import { stringToUuid } from "@ai16z/eliza";
 import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
 import {
+    STYLE_LIST, TW_KOL_1,
     InferMessageProvider,
     TokenDataProvider,
     tokenWatcherConversationTemplate,
@@ -449,6 +450,21 @@ export class DirectClient {
                         console.error("Error fetching token data: ", error);
                     }
                     res.json(report);
+                } else if (req.body.request == "watch_text") {
+                    try {
+                        let report = await InferMessageProvider.getReportText(runtime.cacheManager);
+                        res.json(report);
+                    } catch (error) {
+                        console.error("Error fetching token data: ", error);
+                        res.status(200).send(
+                            "Watcher is in working, please wait."
+                        );
+                        return;
+                    }
+                } else if (req.body.request == "style_list") {
+                    res.json(STYLE_LIST);
+                } else if (req.body.request == "kol_list") {
+                    res.json(TW_KOL_1);
                 } else if (req.body.request == "token_chat") {
                     try {
                         const prompt =
@@ -464,7 +480,7 @@ export class DirectClient {
 
                         if (!response) {
                             res.status(500).send(
-                                "No response from generateMessageResponse"
+                                "No response from generateText"
                             );
                             return;
                         }
