@@ -18,7 +18,8 @@ import { stringToUuid } from "@ai16z/eliza";
 import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
 import {
-    STYLE_LIST, TW_KOL_1,
+    STYLE_LIST,
+    TW_KOL_1,
     InferMessageProvider,
     TokenDataProvider,
     tokenWatcherConversationTemplate,
@@ -28,6 +29,7 @@ import { AgentConfig } from "../../../agent/src/index";
 
 import * as fs from "fs";
 import * as path from "path";
+import { Routes } from "./routes.ts";
 const upload = multer({ storage: multer.memoryStorage() });
 
 export const messageHandlerTemplate =
@@ -69,7 +71,7 @@ export interface SimliClientConfig {
 }
 export class DirectClient {
     public app: express.Application;
-    private agents: Map<string, AgentRuntime>;
+    public agents: Map<string, AgentRuntime>;
     private server: any; // Store server instance
 
     registerCallbackFn: (config: AgentConfig, memory: Memory) => Promise<void>;
@@ -89,8 +91,8 @@ export class DirectClient {
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));
 
-        const apiRouter = createApiRouter(this.agents);
-        this.app.use(apiRouter);
+        const routes = new Routes(this);
+        routes.setupRoutes(this.app);
 
         // Define an interface that extends the Express Request interface
         interface CustomRequest extends ExpressRequest {
@@ -426,7 +428,9 @@ export class DirectClient {
 
                 if (req.body.request == "latest_report") {
                     try {
-                        let report = await InferMessageProvider.getLatestReport(runtime.cacheManager);
+                        let report = await InferMessageProvider.getLatestReport(
+                            runtime.cacheManager
+                        );
                         res.json(report);
                     } catch (error) {
                         console.error("Error fetching token data: ", error);
@@ -452,7 +456,9 @@ export class DirectClient {
                     res.json(report);
                 } else if (req.body.request == "watch_text") {
                     try {
-                        let report = await InferMessageProvider.getReportText(runtime.cacheManager);
+                        let report = await InferMessageProvider.getReportText(
+                            runtime.cacheManager
+                        );
                         res.json(report);
                     } catch (error) {
                         console.error("Error fetching token data: ", error);
