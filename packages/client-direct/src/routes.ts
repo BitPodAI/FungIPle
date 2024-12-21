@@ -2,6 +2,8 @@ import express from "express";
 import { DirectClient } from "./index";
 import { Scraper } from "agent-twitter-client";
 import { stringToUuid } from "@ai16z/eliza";
+import { Memory } from "@ai16z/eliza";
+import { AgentConfig } from "../../../agent/src";
 
 interface TwitterCredentials {
     username: string;
@@ -40,6 +42,19 @@ interface ApiResponse<T = any> {
     success: boolean;
     message: string;
     data?: T;
+}
+
+interface CreateAgentRequest {
+    name?: string;
+    userId?: string;
+    roomId?: string;
+    userName: string;
+    prompt: string;
+    x: {
+        username: string;
+        email: string;
+        password: string;
+    };
 }
 
 class ApiError extends Error {
@@ -238,7 +253,13 @@ class AuthUtils {
 export class Routes {
     private authUtils: AuthUtils;
 
-    constructor(private client: DirectClient) {
+    constructor(
+        private client: DirectClient,
+        private registerCallbackFn?: (
+            config: AgentConfig,
+            memory: Memory
+        ) => Promise<void>
+    ) {
         this.authUtils = new AuthUtils(client);
     }
 
@@ -246,6 +267,7 @@ export class Routes {
         app.post("/:agentId/login", this.handleLogin.bind(this));
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post("/:agentId/profile", this.handleProfileQuery.bind(this));
+        app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
@@ -329,6 +351,99 @@ export class Routes {
             );
 
             return { profile };
+        });
+    }
+
+    async handleCreateAgent(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const { userId } = req.body;
+
+            if (!userId) {
+                throw new ApiError(400, "Missing required field: userId");
+            }
+
+            // Get user profile and credentials
+            const {
+                runtime,
+                config: credentials,
+                profile,
+            } = await this.authUtils.validateRequest(
+                req.params.agentId,
+                userId
+            );
+
+            const {
+                name = profile.username,
+                roomId: customRoomId,
+                prompt,
+            } = req.body;
+
+            if (!prompt) {
+                throw new ApiError(400, "Missing required field: prompt");
+            }
+
+            const roomId = stringToUuid(
+                customRoomId ??
+                    `default-room-${profile.username}-${req.params.agentId}`
+            );
+            const newAgentId = stringToUuid(name);
+
+            // Create agent config from user credentials
+            const agentConfig: AgentConfig = {
+                prompt,
+                name,
+                clients: ["direct"],
+                modelProvider: "openai",
+                bio: [profile.bio || `I am ${name}`],
+                x: {
+                    username: credentials.username,
+                    email: credentials.email,
+                    password: credentials.password,
+                },
+                style: {
+                    all: [],
+                    chat: [],
+                    post: [],
+                },
+                adjectives: [],
+                lore: [],
+                knowledge: [],
+                topics: [],
+            };
+
+            // Ensure connection
+            await runtime.ensureConnection(
+                userId,
+                roomId,
+                profile.username,
+                name,
+                "direct"
+            );
+
+            // Create memory
+            const messageId = stringToUuid(Date.now().toString());
+            const memory: Memory = {
+                id: messageId,
+                agentId: runtime.agentId,
+                userId,
+                roomId,
+                content: {
+                    text: prompt,
+                    attachments: [],
+                    source: "direct",
+                    inReplyTo: undefined,
+                },
+                createdAt: Date.now(),
+            };
+
+            await runtime.messageManager.createMemory(memory);
+
+            // Register callback if provided
+            if (this.registerCallbackFn) {
+                await this.registerCallbackFn(agentConfig, memory);
+            }
+
+            return { agentId: newAgentId };
         });
     }
 }
