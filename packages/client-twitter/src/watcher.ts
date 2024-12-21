@@ -116,6 +116,7 @@ export class TwitterWatchClient {
                     this.runtime.getSetting("TWITTER_USERNAME") +
                     "/lastGen"
             );
+            console.log(lastGen);
 
             const lastGenTimestamp = lastGen?.timestamp ?? 0;
             if (Date.now() > lastGenTimestamp + GEN_TOKEN_REPORT_DELAY) {
@@ -132,7 +133,7 @@ export class TwitterWatchClient {
     }
 
     async fetchTokens() {
-        //console.log("TwitterWatcher fetchTokens");
+        console.log("TwitterWatcher fetchTokens");
         let fetchedTokens = new Map();
 
         try {
@@ -153,7 +154,7 @@ export class TwitterWatchClient {
                         //twText = twText.concat("START_OF_TWEET_TEXT: [" + tweet.text + "] END_OF_TWEET_TEXT");
                     }
                 }
-                //console.log(twText.length);
+                console.log(kolTweets.length);
 
                 const prompt = `
                 Here are some tweets/replied:
@@ -174,7 +175,7 @@ export class TwitterWatchClient {
             
 Please find the token/project involved according to the text provided, and obtain the data of the number of interactions between each token and the three category of accounts (mentions/likes/comments/reposts/posts) in the tweets related to these tokens; mark the tokens as category 1, category 2 or category 3; if there are both category 1 and category 2, choose category 1, which has a higher priority.
  And provide the brief introduction of the key event for each token. And also skip the top/famous tokens.
-Please reply in Chinese and in the following format:
+Please reply in English and in the following format:
 - Token Symbol by json name 'token';
 - Token Interaction Category by json name 'category';
 - Token Interaction Count by json name 'count';
@@ -187,6 +188,7 @@ Use the list format and only provide these 3 pieces of information.`
                     context: prompt,
                     modelClass: ModelClass.MEDIUM,
                 });
+                console.log(response);
                 await this.inferMsgProvider.addInferMessage(response);
             }
 

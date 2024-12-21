@@ -8,7 +8,7 @@ import {
     State,
 } from "@ai16z/eliza";
 
-import { socialProvider, STYLE_LIST, TW_KOL_1, TW_KOL_2, TW_KOL_3 } from "./social.ts";
+import { socialProvider, QUOTES_LIST, STYLE_LIST, TW_KOL_1, TW_KOL_2, TW_KOL_3 } from "./social.ts";
 import {
     TOP_TOKENS,
     topTokenProvider,
@@ -74,6 +74,6 @@ export {
     socialProvider,
     TOP_TOKENS, TokenDataProvider,
     tokenWatcherConversationTemplate,
-    STYLE_LIST,
+    QUOTES_LIST, STYLE_LIST,
     TW_KOL_1, TW_KOL_2, TW_KOL_3
 };

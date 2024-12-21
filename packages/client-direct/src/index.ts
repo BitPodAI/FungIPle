@@ -18,6 +18,7 @@ import { stringToUuid } from "@ai16z/eliza";
 import { settings } from "@ai16z/eliza";
 import { createApiRouter } from "./api.ts";
 import {
+    QUOTES_LIST,
     STYLE_LIST,
     TW_KOL_1,
     InferMessageProvider,
@@ -471,6 +472,10 @@ export class DirectClient {
                     res.json(STYLE_LIST);
                 } else if (req.body.request == "kol_list") {
                     res.json(TW_KOL_1);
+                } else if (req.body.request == "quotes_text") {
+                    const len = QUOTES_LIST.length - 1;
+                    let index = Math.floor(Math.random() * len);
+                    res.json(QUOTES_LIST[index]);
                 } else if (req.body.request == "token_chat") {
                     try {
                         const prompt =

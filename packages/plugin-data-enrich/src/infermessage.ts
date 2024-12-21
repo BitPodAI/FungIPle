@@ -1,6 +1,6 @@
 // The define of AI Infer Message
 import { ICacheManager } from "@ai16z/eliza";
-import { TOP_TOKENS } from "./tokendata.ts";
+import { TokenDataProvider, TOP_TOKENS } from "./tokendata.ts";
 import * as path from "path";
 
 
@@ -56,6 +56,7 @@ export class InferMessageProvider {
             input = input.replaceAll("```", "");
             input = input.replace("json", "");
             let jsonArray = JSON.parse(input);
+            console.log(`addInferMessage: ${jsonArray}`);
             if (jsonArray) {
                 TokenAlphaReport = [];
                 TokenAlphaText = "";
@@ -75,9 +76,12 @@ export class InferMessageProvider {
                             TokenAlphaReport.push(item);
                         }
                     }
+                    console.log(item);
                     if (item.category < category) {
                         category = item.category;
-                        TokenAlphaText = `${item.token}: ${item.event}`;
+                        let baseInfo = TokenDataProvider.fetchTokenInfo(item.token);
+                        console.log(baseInfo);
+                        TokenAlphaText = `${item.token}: ${item.event} \n${baseInfo}`;
                     }
                 });
                 this.setCachedData(TOKEN_REPORT, TokenAlphaReport);

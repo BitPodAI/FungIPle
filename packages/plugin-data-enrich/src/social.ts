@@ -36,11 +36,38 @@ export const TW_KOL_3 = [
 ];
 
 export const STYLE_LIST = [
-    "professional and rigorous",
-    "humorous",
-    "optimistic and positive",
-    "cautious",
-    "Bold and proactive",
+    "Cute",
+    "Caring",
+    "Emotional",
+    "Playful",
+    "Logical",
+    "Humorous",
+    "Cautious",
+    "Professional & Rigorous",
+    "Optimistic & Positive",
+    "Bold & Proactive",
+];
+
+export const QUOTES_LIST = [
+    "Always remember invest in the feature, not just the present!",
+    "The world doesn’t pay you for what you know; it pays you for what you do.",
+    "Wise spending is part of wise investing. And it’s never too late to start.",
+    "Investing puts money to work. The only reason to save money is to invest it.",
+    "If you’re saving, you’re succeeding.",
+    "The first rule of compounding: Never interrupt it unnecessarily.",
+    "Never depend on a single income. Make an investment to create a second source.",
+    "When you invest, you are buying a day that you don’t have to work.",
+    "Live within your income and save so you can invest. Learn what you need to learn.",
+    "‘Experience’ is what you got when you didn’t get what you wanted.",
+    "Invest in yourself. Your career is the engine of your wealth.",
+    "Rapidly changing industries are the enemy of the investor.",
+    "When you’re in a major market downturn, the beta eats the alpha.",
+    "You can’t predict, [but] you can prepare.",
+    "If investing wasn’t hard, everyone would be rich.",
+    "Never stop investing. Never stop improving. Never stop doing something new.",
+    "A great business at a fair price is superior to a fair business at a great price.",
+    "In the short run, the market is a voting machine, but in the long run, it is a weighing machine.",
+    "I make no attempt to forecast the market—my efforts are devoted to finding undervalued securities.",
 ];
 
 

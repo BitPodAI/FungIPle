@@ -22,12 +22,25 @@ export const tokenWatcherConversationTemplate =
 `  + messageCompletionFooter;
 
 const PROVIDER_CONFIG = {
+    COINGECKO_API: "https://api.coingecko.com/api/v3/coins/",
     BIRDEYE_API: "https://public-api.birdeye.so",
     MAX_RETRIES: 3,
     RETRY_DELAY: 2000,
     TOKEN_SECURITY_ENDPOINT: "/defi/token_security?address=",
     TOKEN_TRADE_DATA_ENDPOINT: "/defi/v3/token/trade-data/single?address=",
 };
+
+export interface TokenGeckoBaseData {
+    id: string;
+    image: string; //image.small
+    symbol: string
+    homepage: string; //homepage[0]
+    contract_address: string;
+    market_cap_rank: number;
+    twitter_followers: number; // community_data.twitter_followers
+    watchlist_portfolio_users: number;
+    tikers: string;
+}
 
 export interface TokenSecurityData {
     ownerBalance: string;
@@ -82,7 +95,7 @@ export class TokenDataProvider {
         await this.writeToCache(cacheKey, data);
     }
 
-    private async fetchWithRetry(
+    private static async fetchWithRetry(
         url: string,
         options: RequestInit = {}
     ): Promise<any> {
@@ -96,6 +109,7 @@ export class TokenDataProvider {
                         Accept: "application/json",
                         "x-chain": "solana",
                         "X-API-KEY": settings.BIRDEYE_API_KEY || "",
+                        'x-cg-api-key': settings.GECKO_API_KEY || "",
                         ...options.headers,
                     },
                 });
@@ -128,10 +142,48 @@ export class TokenDataProvider {
         throw lastError;
     }
 
+    static async fetchTokenInfo(token: string): Promise<string> {
+        let output = `**Token Data**\n`;
+        output += `Token: ${token}\n\n`;
+        try {
+            const data = await TokenDataProvider.fetchWithRetry(
+                `${PROVIDER_CONFIG.COINGECKO_API}/${token}`,
+                {}
+            );
+
+            if (data) {
+                const baseData: TokenGeckoBaseData = {
+                    id: data.id,
+                    image: data.image?.small,
+                    symbol: data.symbol,
+                    homepage: data.homepage[0],
+                    contract_address: data.contract_address,
+                    market_cap_rank: data.market_cap_rank,
+                    twitter_followers: data.community_data?.twitter_followers,
+                    watchlist_portfolio_users: data.watchlist_portfolio_users,
+                    tikers: JSON.stringify(data.tikers[0]),
+                };
+
+                // Security Data
+                output += `- Homepage: ${baseData.homepage}\n`;
+                output += `- MarketCap Rank: ${baseData.market_cap_rank}\n`;
+                output += `- Twitter Followers: ${baseData.twitter_followers}%\n`;
+                output += `- Watchlist Users: ${baseData.watchlist_portfolio_users}\n`;
+                output += `- Tikers: ${baseData.tikers}%\n\n`;
+                output += `\n`;
+
+                console.log("Formatted token data:", output);
+            }
+        } catch (error) {
+            console.error("Error fetching prices:", error);
+        }
+        return output;
+    }
+
     async fetchTokenSecurity(tokenSymbol: string): Promise<TokenSecurityData> {
         console.log(tokenSymbol);
         const url = `${PROVIDER_CONFIG.BIRDEYE_API}${PROVIDER_CONFIG.TOKEN_SECURITY_ENDPOINT}${tokenSymbol}`;
-        const data = await this.fetchWithRetry(url);
+        const data = await TokenDataProvider.fetchWithRetry(url);
         console.log(data);
 
         if (!data?.success || !data?.data) {
