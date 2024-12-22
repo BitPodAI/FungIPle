@@ -515,7 +515,9 @@ export class Routes {
 
     async handleConfigQuery(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const quoteIndex = Math.floor(Math.random() * QUOTES_LIST.length);
+            const quoteIndex = Math.floor(
+                Math.random() * (QUOTES_LIST.length - 1)
+            );
             return {
                 styles: STYLE_LIST,
                 kols: TW_KOL_1,
