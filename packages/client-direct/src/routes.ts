@@ -39,6 +39,7 @@ interface UserProfile {
 }
 
 interface ApiResponse<T = any> {
+    status: number;
     success: boolean;
     message: string;
     data?: T;
@@ -80,10 +81,10 @@ class AuthUtils {
 
     private createErrorResponse(error: Error | ApiError): ApiResponse {
         const status = error instanceof ApiError ? error.status : 500;
-        const message =
-            error instanceof ApiError ? error.message : "Internal server error";
+        const message = error.message ?? "Internal server error";
 
         return {
+            status,
             success: false,
             message,
         };
