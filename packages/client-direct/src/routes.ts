@@ -4,6 +4,14 @@ import { Scraper } from "agent-twitter-client";
 import { stringToUuid } from "@ai16z/eliza";
 import { Memory } from "@ai16z/eliza";
 import { AgentConfig } from "../../../agent/src";
+import {
+    QUOTES_LIST,
+    STYLE_LIST,
+    TW_KOL_1,
+    InferMessageProvider,
+    TokenDataProvider,
+    tokenWatcherConversationTemplate,
+} from "@ai16z/plugin-data-enrich";
 
 interface TwitterCredentials {
     username: string;
@@ -39,7 +47,7 @@ interface UserProfile {
 }
 
 interface ApiResponse<T = any> {
-    status: number;
+    status?: number;
     success: boolean;
     message: string;
     data?: T;
@@ -269,6 +277,7 @@ export class Routes {
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post("/:agentId/profile", this.handleProfileQuery.bind(this));
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
+        app.get("/:agentId/config", this.handleConfigQuery.bind(this));
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
@@ -324,40 +333,89 @@ export class Routes {
     }
 
     async handleProfileUpdate(req: express.Request, res: express.Response) {
-        return this.authUtils.withErrorHandling(req, res, async () => {
-            const { username, profile: updateFields } = req.body;
+        try {
+            const { profile } = req.body;
 
-            const userId = stringToUuid(username);
+            // 验证必要字段
+            if (!profile || !profile.name || !profile.bio || !profile.style) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Missing required profile fields",
+                });
+            }
 
+            // 验证数组字段
+            if (
+                !Array.isArray(profile.bio) ||
+                !Array.isArray(profile.topics) ||
+                !Array.isArray(profile.messageExamples)
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid array fields in profile",
+                });
+            }
+
+            // 验证嵌套对象
+            if (
+                !profile.style.all ||
+                !profile.style.chat ||
+                !profile.style.post ||
+                !Array.isArray(profile.style.all) ||
+                !Array.isArray(profile.style.chat) ||
+                !Array.isArray(profile.style.post)
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    error: "Invalid style configuration",
+                });
+            }
+
+            // 更新profile
             const { runtime, profile: existingProfile } =
                 await this.authUtils.validateRequest(
                     req.params.agentId,
-                    userId
+                    stringToUuid(req.body.username)
                 );
 
-            const updatedProfile = { ...existingProfile, ...updateFields };
+            const updatedProfile = { ...existingProfile, ...profile };
             await runtime.databaseAdapter?.setCache({
-                agentId: userId,
+                agentId: stringToUuid(req.body.username),
                 key: "userProfile",
                 value: JSON.stringify(updatedProfile),
             });
 
-            return { profile: updatedProfile };
-        });
+            return res.json({
+                success: true,
+                profile: updatedProfile,
+            });
+        } catch (error) {
+            console.error("Profile update error:", error);
+            return res.status(500).json({
+                success: false,
+                error: "Internal server error",
+            });
+        }
     }
 
     async handleProfileQuery(req: express.Request, res: express.Response) {
-        return this.authUtils.withErrorHandling(req, res, async () => {
-            const { username } = req.body;
-            const userId = stringToUuid(username);
-
+        try {
             const { profile } = await this.authUtils.validateRequest(
                 req.params.agentId,
-                userId
+                stringToUuid(req.body.username)
             );
 
-            return { profile };
-        });
+            return res.json({
+                success: true,
+                profile,
+            });
+        } catch (error) {
+            console.error("Profile query error:", error);
+            return res.status(500).json({
+                success: false,
+                error: "Internal server error",
+            });
+        }
     }
 
     async handleCreateAgent(req: express.Request, res: express.Response) {
@@ -451,6 +509,17 @@ export class Routes {
             }
 
             return { agentId: newAgentId };
+        });
+    }
+
+    async handleConfigQuery(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const quoteIndex = Math.floor(Math.random() * QUOTES_LIST.length);
+            return {
+                styles: STYLE_LIST,
+                kols: TW_KOL_1,
+                quote: QUOTES_LIST[quoteIndex],
+            };
         });
     }
 }
