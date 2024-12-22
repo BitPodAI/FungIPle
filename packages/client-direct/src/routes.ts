@@ -279,6 +279,7 @@ export class Routes {
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
         app.get("/:agentId/config", this.handleConfigQuery.bind(this));
         app.get("/:agentId/watch", this.handleWatchText.bind(this));
+        app.post("/:agentId/chat", this.handleChat.bind(this));
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
@@ -537,6 +538,34 @@ export class Routes {
             } catch (error) {
                 console.error("Error fetching token data:", error);
                 return { report: "Watcher is in working, please wait." };
+            }
+        });
+    }
+
+    async handleChat(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const prompt =
+                `Here are user input content:\n${req.body.text}` +
+                tokenWatcherConversationTemplate;
+
+            try {
+                let response = await generateText({
+                    runtime: runtime,
+                    context: prompt,
+                    modelClass: ModelClass.SMALL,
+                });
+
+                if (!response) {
+                    throw new Error("No response from generateText");
+                }
+                response = response.replaceAll("```", "");
+                response = response.replace("json", "");
+
+                return { response };
+            } catch (error) {
+                console.error("Error response token question:", error);
+                return { response: "Response with error" };
             }
         });
     }
