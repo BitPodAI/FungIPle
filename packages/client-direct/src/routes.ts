@@ -278,6 +278,7 @@ export class Routes {
         app.post("/:agentId/profile", this.handleProfileQuery.bind(this));
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
         app.get("/:agentId/config", this.handleConfigQuery.bind(this));
+        app.get("/:agentId/watch", this.handleWatchText.bind(this));
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
@@ -520,6 +521,21 @@ export class Routes {
                 kols: TW_KOL_1,
                 quote: QUOTES_LIST[quoteIndex],
             };
+        });
+    }
+
+    async handleWatchText(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            try {
+                const report = await InferMessageProvider.getReportText(
+                    runtime.cacheManager
+                );
+                return { report };
+            } catch (error) {
+                console.error("Error fetching token data:", error);
+                return { report: "Watcher is in working, please wait." };
+            }
         });
     }
 }
