@@ -1,7 +1,7 @@
 import express from "express";
 import { DirectClient } from "./index";
 import { Scraper } from "agent-twitter-client";
-import { stringToUuid } from "@ai16z/eliza";
+import { generateText, ModelClass, stringToUuid } from "@ai16z/eliza";
 import { Memory } from "@ai16z/eliza";
 import { AgentConfig } from "../../../agent/src";
 import {
