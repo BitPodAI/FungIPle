@@ -278,7 +278,7 @@ export class Routes {
                 email,
                 password,
                 roomId: customRoomId,
-                userId: customUserId,
+                // userId: customUserId,
             } = req.body;
 
             if (!username || !email || !password) {
@@ -293,7 +293,7 @@ export class Routes {
                     email,
                 });
 
-            const userId = stringToUuid(customUserId ?? username);
+            const userId = stringToUuid(username);
             const roomId = stringToUuid(
                 customRoomId ?? `default-room-${username}-${req.params.agentId}`
             );
@@ -325,7 +325,10 @@ export class Routes {
 
     async handleProfileUpdate(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const { userId, profile: updateFields } = req.body;
+            const { username, profile: updateFields } = req.body;
+
+            const userId = stringToUuid(username);
+
             const { runtime, profile: existingProfile } =
                 await this.authUtils.validateRequest(
                     req.params.agentId,
@@ -345,7 +348,9 @@ export class Routes {
 
     async handleProfileQuery(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const { userId } = req.body;
+            const { username } = req.body;
+            const userId = stringToUuid(username);
+
             const { profile } = await this.authUtils.validateRequest(
                 req.params.agentId,
                 userId
@@ -357,7 +362,8 @@ export class Routes {
 
     async handleCreateAgent(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const { userId } = req.body;
+            const { username } = req.body;
+            const userId = stringToUuid(username);
 
             if (!userId) {
                 throw new ApiError(400, "Missing required field: userId");
