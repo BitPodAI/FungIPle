@@ -578,6 +578,7 @@ const startAgents = async () => {
                 TWITTER_USERNAME: config?.x?.username,
                 TWITTER_PASSWORD: config?.x?.password,
                 TWITTER_EMAIL: config?.x?.email,
+                POST_IMMEDIATELY: "1",
                 AGENT_PROMPT: config?.prompt,
             };
 
