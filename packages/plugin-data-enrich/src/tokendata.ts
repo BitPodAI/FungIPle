@@ -24,7 +24,7 @@ export const tokenWatcherConversationTemplate =
 const PROVIDER_CONFIG = {
     COINGECKO_API: "https://api.coingecko.com/api/v3/coins/",
     BIRDEYE_API: "https://public-api.birdeye.so",
-    MAX_RETRIES: 3,
+    MAX_RETRIES: 2,
     RETRY_DELAY: 2000,
     TOKEN_SECURITY_ENDPOINT: "/defi/token_security?address=",
     TOKEN_TRADE_DATA_ENDPOINT: "/defi/v3/token/trade-data/single?address=",
@@ -145,6 +145,7 @@ export class TokenDataProvider {
     static async fetchTokenInfo(token: string): Promise<string> {
         let output = `**Token Data**\n`;
         output += `Token: ${token}\n\n`;
+        console.log(`fetchTokenInfo: ${token}`);
         try {
             const data = await TokenDataProvider.fetchWithRetry(
                 `${PROVIDER_CONFIG.COINGECKO_API}/${token}`,
@@ -175,7 +176,7 @@ export class TokenDataProvider {
                 console.log("Formatted token data:", output);
             }
         } catch (error) {
-            console.error("Error fetching prices:", error);
+            console.error("Error fetching data:", error);
         }
         return output;
     }

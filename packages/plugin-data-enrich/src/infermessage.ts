@@ -5,7 +5,7 @@ import * as path from "path";
 
 
 var TokenAlphaReport = [];
-var TokenAlphaText = "";
+var TokenAlphaText = [];
 const TOKEN_REPORT: string = "_token_report";
 const TOKEN_ALPHA_TEXT: string = "_token_alpha_text";
 
@@ -17,6 +17,13 @@ interface InferMessage {
     event: Text;
 }
 
+interface WatchItem {
+    token: string;
+    title: string;
+    updateAt: string;
+    text: string;
+}
+
 export class InferMessageProvider {
     private static cacheKey: string = "data-enrich/infermessage";
 
@@ -26,6 +33,7 @@ export class InferMessageProvider {
     }
 
     private async readFromCache<T>(key: string): Promise<T | null> {
+        console.log(`readFromCache ${key}`);
         const cached = await this.cacheManager.get<T>(
             path.join(InferMessageProvider.cacheKey, key)
         );
@@ -33,6 +41,7 @@ export class InferMessageProvider {
     }
 
     private async writeToCache<T>(key: string, data: T): Promise<void> {
+        console.log(`writeToCache ${key}`);
         await this.cacheManager.set(path.join(InferMessageProvider.cacheKey, key), data, {
             expires: Date.now() + 3 * 24 * 60 * 60 * 1000,
         });
@@ -59,10 +68,10 @@ export class InferMessageProvider {
             console.log(`addInferMessage: ${jsonArray}`);
             if (jsonArray) {
                 TokenAlphaReport = [];
-                TokenAlphaText = "";
+                TokenAlphaText = [];
                 var category = 4;
                 // Merge results
-                jsonArray.forEach(async item => {
+                await jsonArray.forEach(async item => {
                     const existingItem = await this.getCachedData<InferMessage>(item.token);
                     if (existingItem) {
                         // Merge category & count
@@ -79,11 +88,20 @@ export class InferMessageProvider {
                     console.log(item);
                     if (item.category < category) {
                         category = item.category;
-                        let baseInfo = TokenDataProvider.fetchTokenInfo(item.token);
-                        console.log(baseInfo);
-                        TokenAlphaText = `${item.token}: ${item.event} \n${baseInfo}`;
+                        //let baseInfo = await TokenDataProvider.fetchTokenInfo(item.token);
+                        //console.log(baseInfo);
+                        let alpha: WatchItem = {
+                            token: item.token,
+                            title: `KOLs mentioned/followed ${item.count} times`,
+                            updateAt: new Date().toISOString(),
+                            //text: `${item.token}: ${item.event} \n${baseInfo}`,
+                            text: `${item.token}: ${item.event}`,
+                        }
+                        TokenAlphaText.push(alpha);
                     }
                 });
+                console.log(TokenAlphaReport);
+                console.log(TokenAlphaText);
                 this.setCachedData(TOKEN_REPORT, TokenAlphaReport);
                 this.setCachedData(TOKEN_ALPHA_TEXT, TokenAlphaText);
             }
@@ -116,14 +134,34 @@ export class InferMessageProvider {
 
     static async getReportText(cacheManager: ICacheManager) {
         try {
-            const report = await cacheManager.get<[InferMessage]>(
-                path.join(InferMessageProvider.cacheKey, TOKEN_REPORT)
+            const report = await cacheManager.get<[WatchItem]>(
+                path.join(InferMessageProvider.cacheKey, TOKEN_ALPHA_TEXT)
             );
+            console.log(report);
             if (report) {
                 try {
-                    if (typeof report === "object") {
-                        let item = report[0];
-                        return `${item.token} is mentioned ${item.count} times, ${item.event}`;
+                    const json = JSON.stringify(report[0]);
+                    if (json) {
+                        return json;
+                    }
+                } catch (error) {
+                    console.error("Error fetching token data: ", error);
+                }
+            }
+        } catch (error) {
+            console.error("An error occurred in report :", error);
+        }
+        return "{}";
+    }
+
+    async getAlphaText() {
+        try {
+            const report = await this.getCachedData<[WatchItem]>(TOKEN_ALPHA_TEXT);
+            if (report) {
+                try {
+                    const json = JSON.stringify(report[0]);
+                    if (json) {
+                        return json;
                     }
                 } catch (error) {
                     console.error("Error fetching token data: ", error);
@@ -131,19 +169,7 @@ export class InferMessageProvider {
                 return report;
             }
         } catch (error) {
-            console.error("An error occurred:", error);
-        }
-        return "";
-    }
-
-    async getAlphaText() {
-        try {
-            const text = await this.getCachedData<string>(TOKEN_ALPHA_TEXT);
-            if (text) {
-                return text;
-            }
-        } catch (error) {
-            console.error("An error occurred:", error);
+            console.error("An error occurred in apha:", error);
         }
         return "";
     }
