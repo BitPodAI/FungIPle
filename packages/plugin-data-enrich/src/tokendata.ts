@@ -36,10 +36,10 @@ export interface TokenGeckoBaseData {
     symbol: string
     homepage: string; //homepage[0]
     contract_address: string;
-    market_cap_rank: number;
+    market_cap_rank: string;
     twitter_followers: number; // community_data.twitter_followers
     watchlist_portfolio_users: number;
-    tikers: string;
+    tickers: string;
 }
 
 export interface TokenSecurityData {
@@ -157,20 +157,20 @@ export class TokenDataProvider {
                     id: data.id,
                     image: data.image?.small,
                     symbol: data.symbol,
-                    homepage: data.homepage[0],
+                    homepage: data.links?.homepage[0],
                     contract_address: data.contract_address,
                     market_cap_rank: data.market_cap_rank,
                     twitter_followers: data.community_data?.twitter_followers,
                     watchlist_portfolio_users: data.watchlist_portfolio_users,
-                    tikers: JSON.stringify(data.tikers[0]),
+                    tickers: JSON.stringify(data.tickers?.length),
                 };
 
                 // Security Data
                 output += `- Homepage: ${baseData.homepage}\n`;
                 output += `- MarketCap Rank: ${baseData.market_cap_rank}\n`;
-                output += `- Twitter Followers: ${baseData.twitter_followers}%\n`;
+                output += `- Twitter Followers: ${baseData.twitter_followers}\n`;
                 output += `- Watchlist Users: ${baseData.watchlist_portfolio_users}\n`;
-                output += `- Tikers: ${baseData.tikers}%\n\n`;
+                output += `- Tickers: ${baseData.tickers}\n\n`;
                 output += `\n`;
 
                 console.log("Formatted token data:", output);

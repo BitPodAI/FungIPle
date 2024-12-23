@@ -33,7 +33,6 @@ export class InferMessageProvider {
     }
 
     private async readFromCache<T>(key: string): Promise<T | null> {
-        console.log(`readFromCache ${key}`);
         const cached = await this.cacheManager.get<T>(
             path.join(InferMessageProvider.cacheKey, key)
         );
@@ -41,7 +40,6 @@ export class InferMessageProvider {
     }
 
     private async writeToCache<T>(key: string, data: T): Promise<void> {
-        console.log(`writeToCache ${key}`);
         await this.cacheManager.set(path.join(InferMessageProvider.cacheKey, key), data, {
             expires: Date.now() + 3 * 24 * 60 * 60 * 1000,
         });
@@ -65,13 +63,13 @@ export class InferMessageProvider {
             input = input.replaceAll("```", "");
             input = input.replace("json", "");
             let jsonArray = JSON.parse(input);
-            console.log(`addInferMessage: ${jsonArray}`);
+            //console.log(`addInferMessage: ${jsonArray}`);
             if (jsonArray) {
                 TokenAlphaReport = [];
                 TokenAlphaText = [];
                 var category = 4;
                 // Merge results
-                await jsonArray.forEach(async item => {
+                for (const item of jsonArray) {
                     const existingItem = await this.getCachedData<InferMessage>(item.token);
                     if (existingItem) {
                         // Merge category & count
@@ -85,28 +83,27 @@ export class InferMessageProvider {
                             TokenAlphaReport.push(item);
                         }
                     }
-                    console.log(item);
+
                     if (item.category < category) {
                         category = item.category;
-                        //let baseInfo = await TokenDataProvider.fetchTokenInfo(item.token);
+                        let baseInfo = await TokenDataProvider.fetchTokenInfo(item.token);
                         //console.log(baseInfo);
                         let alpha: WatchItem = {
                             token: item.token,
                             title: `KOLs mentioned/followed ${item.count} times`,
-                            updateAt: new Date().toISOString(),
-                            //text: `${item.token}: ${item.event} \n${baseInfo}`,
-                            text: `${item.token}: ${item.event}`,
+                            updateAt: new Date().toUTCString().replace(/:/g, "-"),
+                            text: `${item.token}: ${item.event} \n${baseInfo}`,
+                            //text: `${item.token}: ${item.event}`,
                         }
                         TokenAlphaText.push(alpha);
                     }
-                });
-                console.log(TokenAlphaReport);
-                console.log(TokenAlphaText);
+                }
+                //console.log(TokenAlphaText);
                 this.setCachedData(TOKEN_REPORT, TokenAlphaReport);
                 this.setCachedData(TOKEN_ALPHA_TEXT, TokenAlphaText);
             }
         } catch (error) {
-            console.error("An error occurred:", error);
+            console.error("An error occurred in addMsg:", error);
         }
     }
 
@@ -137,7 +134,6 @@ export class InferMessageProvider {
             const report = await cacheManager.get<[WatchItem]>(
                 path.join(InferMessageProvider.cacheKey, TOKEN_ALPHA_TEXT)
             );
-            console.log(report);
             if (report) {
                 try {
                     const json = JSON.stringify(report[0]);
