@@ -28,7 +28,7 @@ interface UserProfile {
     username: string;
     email: string;
     avatar?: string;
-    bio?: string;
+    bio?: string | string[];
     walletAddress?: string;
     level: number;
     experience: number;
@@ -44,6 +44,15 @@ interface UserProfile {
         successfulTweets: number;
         failedTweets: number;
     };
+    style?: {
+        all: string[];
+        chat: string[];
+        post: string[];
+    };
+    adjectives?: string[];
+    lore?: string[];
+    knowledge?: string[];
+    topics?: string[];
 }
 
 interface ApiResponse<T = any> {
@@ -461,21 +470,23 @@ export class Routes {
                 name,
                 clients: ["direct"],
                 modelProvider: "openai",
-                bio: [profile.bio || `I am ${name}`],
+                bio: Array.isArray(profile.bio)
+                    ? profile.bio
+                    : [profile.bio || `I am ${name}`],
                 x: {
                     username: credentials.username,
                     email: credentials.email,
                     password: credentials.password,
                 },
-                style: {
+                style: profile.style || {
                     all: [],
                     chat: [],
                     post: [],
                 },
-                adjectives: [],
-                lore: [],
-                knowledge: [],
-                topics: [],
+                adjectives: profile.adjectives || [],
+                lore: profile.lore || [],
+                knowledge: profile.knowledge || [],
+                topics: profile.topics || [],
             };
 
             // Ensure connection
