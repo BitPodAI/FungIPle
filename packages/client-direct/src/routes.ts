@@ -15,6 +15,7 @@ import { InvalidPublicKeyError } from "./solana";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTokenTransferTransaction } from './solana';
+import { callSolanaAgentTransfer } from './solanaagentkit';
 
 interface TwitterCredentials {
     username: string;
@@ -288,6 +289,7 @@ export class Routes {
         app.get("/:agentId/watch", this.handleWatchText.bind(this));
         app.post("/:agentId/chat", this.handleChat.bind(this));
         app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
+        app.post("/:agentId/solkit_transfer", this.handleSolAgentKitTransfer.bind(this));
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
@@ -602,6 +604,28 @@ export class Routes {
                     throw new ApiError(400, error.message);
                 }
                 console.error("Error creating token transfer transaction:", error);
+                throw new ApiError(500, "Internal server error");
+            }
+        });
+    }
+
+    async handleSolAgentKitTransfer(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const { fromTokenAccountPubkey, toTokenAccountPubkey, ownerPubkey, tokenAmount } = req.body;
+
+            try {
+                const transaction = await callSolanaAgentTransfer({
+                    toTokenAccountPubkey,
+                    mintPubkey: ownerPubkey,
+                    tokenAmount,
+                });
+
+                return { transaction };
+            } catch (error) {
+                if (error instanceof InvalidPublicKeyError) {
+                    throw new ApiError(400, error.message);
+                }
+                console.error("Error in SolAgentKit transfer:", error);
                 throw new ApiError(500, "Internal server error");
             }
         });
