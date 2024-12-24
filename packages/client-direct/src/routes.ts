@@ -12,12 +12,12 @@ import {
     tokenWatcherConversationTemplate,
 } from "@ai16z/plugin-data-enrich";
 
-// import { callSolanaAgentTransfer } from "./solanaagentkit";
+import { callSolanaAgentTransfer } from "./solanaagentkit";
 
-// import { InvalidPublicKeyError } from "./solana";
-// import { Connection, clusterApiUrl } from "@solana/web3.js";
-// import { sendAndConfirmTransaction } from "@solana/web3.js";
-// import { createTokenTransferTransaction } from "./solana";
+import { InvalidPublicKeyError } from "./solana";
+import { Connection, clusterApiUrl } from "@solana/web3.js";
+import { sendAndConfirmTransaction } from "@solana/web3.js";
+import { createTokenTransferTransaction } from "./solana";
 
 interface TwitterCredentials {
     username: string;
@@ -597,36 +597,36 @@ export class Routes {
                 tokenAmount,
             } = req.body;
 
-            // try {
-            //     const transaction = await createTokenTransferTransaction({
-            //         fromTokenAccountPubkey,
-            //         toTokenAccountPubkey,
-            //         ownerPubkey,
-            //         tokenAmount,
-            //     });
+            try {
+                const transaction = await createTokenTransferTransaction({
+                    fromTokenAccountPubkey,
+                    toTokenAccountPubkey,
+                    ownerPubkey,
+                    tokenAmount,
+                });
 
-            //     // 发送并确认交易
-            //     const connection = new Connection(
-            //         clusterApiUrl("mainnet-beta"),
-            //         "confirmed"
-            //     );
-            //     const signature = await sendAndConfirmTransaction(
-            //         connection,
-            //         transaction,
-            //         [ownerPubkey]
-            //     );
+                // 发送并确认交易
+                const connection = new Connection(
+                    clusterApiUrl("mainnet-beta"),
+                    "confirmed"
+                );
+                const signature = await sendAndConfirmTransaction(
+                    connection,
+                    transaction,
+                    [ownerPubkey]
+                );
 
-            //     return { signature };
-            // } catch (error) {
-            //     if (error instanceof InvalidPublicKeyError) {
-            //         throw new ApiError(400, error.message);
-            //     }
-            //     console.error(
-            //         "Error creating token transfer transaction:",
-            //         error
-            //     );
-            //     throw new ApiError(500, "Internal server error");
-            // }
+                return { signature };
+            } catch (error) {
+                if (error instanceof InvalidPublicKeyError) {
+                    throw new ApiError(400, error.message);
+                }
+                console.error(
+                    "Error creating token transfer transaction:",
+                    error
+                );
+                throw new ApiError(500, "Internal server error");
+            }
         });
     }
 
@@ -635,26 +635,26 @@ export class Routes {
         res: express.Response
     ) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            // const {
-            //     fromTokenAccountPubkey,
-            //     toTokenAccountPubkey,
-            //     ownerPubkey,
-            //     tokenAmount,
-            // } = req.body;
-            // try {
-            //     const transaction = await callSolanaAgentTransfer({
-            //         toTokenAccountPubkey,
-            //         mintPubkey: ownerPubkey,
-            //         tokenAmount,
-            //     });
-            //     return { transaction };
-            // } catch (error) {
-            //     if (error instanceof InvalidPublicKeyError) {
-            //         throw new ApiError(400, error.message);
-            //     }
-            //     console.error("Error in SolAgentKit transfer:", error);
-            //     throw new ApiError(500, "Internal server error");
-            // }
+            const {
+                fromTokenAccountPubkey,
+                toTokenAccountPubkey,
+                ownerPubkey,
+                tokenAmount,
+            } = req.body;
+            try {
+                const transaction = await callSolanaAgentTransfer({
+                    toTokenAccountPubkey,
+                    mintPubkey: ownerPubkey,
+                    tokenAmount,
+                });
+                return { transaction };
+            } catch (error) {
+                if (error instanceof InvalidPublicKeyError) {
+                    throw new ApiError(400, error.message);
+                }
+                console.error("Error in SolAgentKit transfer:", error);
+                throw new ApiError(500, "Internal server error");
+            }
         });
     }
 }
