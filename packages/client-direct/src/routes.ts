@@ -11,11 +11,13 @@ import {
     InferMessageProvider,
     tokenWatcherConversationTemplate,
 } from "@ai16z/plugin-data-enrich";
-import { InvalidPublicKeyError } from "./solana";
-import { Connection, clusterApiUrl } from "@solana/web3.js";
-import { sendAndConfirmTransaction } from "@solana/web3.js";
-import { createTokenTransferTransaction } from './solana';
-import { callSolanaAgentTransfer } from './solanaagentkit';
+
+import { callSolanaAgentTransfer } from "./solanaagentkit";
+
+// import { InvalidPublicKeyError } from "./solana";
+// import { Connection, clusterApiUrl } from "@solana/web3.js";
+// import { sendAndConfirmTransaction } from "@solana/web3.js";
+// import { createTokenTransferTransaction } from "./solana";
 
 interface TwitterCredentials {
     username: string;
@@ -289,7 +291,10 @@ export class Routes {
         app.get("/:agentId/watch", this.handleWatchText.bind(this));
         app.post("/:agentId/chat", this.handleChat.bind(this));
         app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
-        app.post("/:agentId/solkit_transfer", this.handleSolAgentKitTransfer.bind(this));
+        app.post(
+            "/:agentId/solkit_transfer",
+            this.handleSolAgentKitTransfer.bind(this)
+        );
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
@@ -455,9 +460,9 @@ export class Routes {
                 prompt,
             } = req.body;
 
-            if (!prompt) {
-                throw new ApiError(400, "Missing required field: prompt");
-            }
+            // if (!prompt) {
+            //     throw new ApiError(400, "Missing required field: prompt");
+            // }
 
             const roomId = stringToUuid(
                 customRoomId ??
@@ -467,6 +472,7 @@ export class Routes {
 
             // Create agent config from user credentials
             const agentConfig: AgentConfig = {
+                ...profile,
                 prompt,
                 name,
                 clients: ["direct"],
@@ -518,11 +524,11 @@ export class Routes {
             await runtime.messageManager.createMemory(memory);
 
             // Register callback if provided
-            if (this.registerCallbackFn) {
-                await this.registerCallbackFn(agentConfig, memory);
+            if (this.client.registerCallbackFn) {
+                await this.client.registerCallbackFn(agentConfig, memory);
             }
 
-            return { agentId: newAgentId };
+            return { profile, agentId: newAgentId };
         });
     }
 
@@ -584,34 +590,57 @@ export class Routes {
 
     async handleSolTransfer(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const { fromTokenAccountPubkey, toTokenAccountPubkey, ownerPubkey, tokenAmount } = req.body;
+            const {
+                fromTokenAccountPubkey,
+                toTokenAccountPubkey,
+                ownerPubkey,
+                tokenAmount,
+            } = req.body;
 
-            try {
-                const transaction = await createTokenTransferTransaction({
-                    fromTokenAccountPubkey,
-                    toTokenAccountPubkey,
-                    ownerPubkey,
-                    tokenAmount,
-                });
+            // try {
+            //     const transaction = await createTokenTransferTransaction({
+            //         fromTokenAccountPubkey,
+            //         toTokenAccountPubkey,
+            //         ownerPubkey,
+            //         tokenAmount,
+            //     });
 
-                // 发送并确认交易
-                const connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
-                const signature = await sendAndConfirmTransaction(connection, transaction, [ownerPubkey]);
+            //     // 发送并确认交易
+            //     const connection = new Connection(
+            //         clusterApiUrl("mainnet-beta"),
+            //         "confirmed"
+            //     );
+            //     const signature = await sendAndConfirmTransaction(
+            //         connection,
+            //         transaction,
+            //         [ownerPubkey]
+            //     );
 
-                return { signature };
-            } catch (error) {
-                if (error instanceof InvalidPublicKeyError) {
-                    throw new ApiError(400, error.message);
-                }
-                console.error("Error creating token transfer transaction:", error);
-                throw new ApiError(500, "Internal server error");
-            }
+            //     return { signature };
+            // } catch (error) {
+            //     if (error instanceof InvalidPublicKeyError) {
+            //         throw new ApiError(400, error.message);
+            //     }
+            //     console.error(
+            //         "Error creating token transfer transaction:",
+            //         error
+            //     );
+            //     throw new ApiError(500, "Internal server error");
+            // }
         });
     }
 
-    async handleSolAgentKitTransfer(req: express.Request, res: express.Response) {
+    async handleSolAgentKitTransfer(
+        req: express.Request,
+        res: express.Response
+    ) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const { fromTokenAccountPubkey, toTokenAccountPubkey, ownerPubkey, tokenAmount } = req.body;
+            const {
+                fromTokenAccountPubkey,
+                toTokenAccountPubkey,
+                ownerPubkey,
+                tokenAmount,
+            } = req.body;
 
             try {
                 const transaction = await callSolanaAgentTransfer({

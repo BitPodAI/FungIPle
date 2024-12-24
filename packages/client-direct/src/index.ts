@@ -92,7 +92,7 @@ export class DirectClient {
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));
 
-        const routes = new Routes(this);
+        const routes = new Routes(this, this.registerCallbackFn);
         routes.setupRoutes(this.app);
 
         // Define an interface that extends the Express Request interface

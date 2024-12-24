@@ -1,13 +1,17 @@
-import { TOP_TOKENS, TW_KOL_1, TW_KOL_2, TW_KOL_3 } from "@ai16z/plugin-data-enrich";
-import { ConsensusProvider, InferMessageProvider } from "@ai16z/plugin-data-enrich";
 import {
-    ModelClass,
-    IAgentRuntime,
-} from "@ai16z/eliza";
+    TOP_TOKENS,
+    TW_KOL_1,
+    TW_KOL_2,
+    TW_KOL_3,
+} from "@ai16z/plugin-data-enrich";
+import {
+    ConsensusProvider,
+    InferMessageProvider,
+} from "@ai16z/plugin-data-enrich";
+import { ModelClass, IAgentRuntime } from "@ai16z/eliza";
 import { generateText } from "@ai16z/eliza";
 import { ClientBase } from "./base";
 import * as path from "path";
-
 
 export const watcherCompletionFooter = `\nResponse format should be formatted in a JSON block like this:
 [
@@ -69,7 +73,9 @@ export class TwitterWatchClient {
         this.client = client;
         this.runtime = runtime;
         this.consensus = new ConsensusProvider(this.runtime);
-        this.inferMsgProvider = new InferMessageProvider(this.runtime.cacheManager);
+        this.inferMsgProvider = new InferMessageProvider(
+            this.runtime.cacheManager
+        );
     }
 
     private async readFromCache<T>(key: string): Promise<T | null> {
@@ -80,9 +86,13 @@ export class TwitterWatchClient {
     }
 
     private async writeToCache<T>(key: string, data: T): Promise<void> {
-        await this.runtime.cacheManager.set(path.join(this.cacheKey, key), data, {
-            expires: Date.now() + 5 * 60 * 60 * 1000,
-        });
+        await this.runtime.cacheManager.set(
+            path.join(this.cacheKey, key),
+            data,
+            {
+                expires: Date.now() + 5 * 60 * 60 * 1000,
+            }
+        );
     }
 
     private async getCachedData<T>(key: string): Promise<T | null> {
@@ -127,7 +137,9 @@ export class TwitterWatchClient {
                 genReportLoop(); // Set up next iteration
             }, GEN_TOKEN_REPORT_DELAY);
 
-            console.log(`Next tweet scheduled in ${GEN_TOKEN_REPORT_DELAY / 60 / 1000} minutes`);
+            console.log(
+                `Next tweet scheduled in ${GEN_TOKEN_REPORT_DELAY / 60 / 1000} minutes`
+            );
         };
         genReportLoop();
     }
@@ -138,32 +150,44 @@ export class TwitterWatchClient {
 
         try {
             const currentTime = new Date();
-            const timeline = Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
+            const timeline =
+                Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
             for (const kolList of [TW_KOL_1, TW_KOL_2, TW_KOL_3]) {
                 //let twText = "";
                 let kolTweets = [];
                 for (const kol of kolList) {
                     //console.log(kol.substring(1));
-                    let tweets = await this.client.twitterClient.getTweetsAndReplies(kol.substring(1), 60);
+                    let tweets =
+                        await this.client.twitterClient.getTweetsAndReplies(
+                            kol.substring(1),
+                            60
+                        );
                     // Fetch and process tweets
-                    for await (const tweet of tweets) {
-                        if (tweet.timestamp < timeline) {
-                            continue; // Skip the outdates.
+                    try {
+                        for await (const tweet of tweets) {
+                            if (tweet.timestamp < timeline) {
+                                continue; // Skip the outdates.
+                            }
+                            kolTweets.push(tweet);
+                            //twText = twText.concat("START_OF_TWEET_TEXT: [" + tweet.text + "] END_OF_TWEET_TEXT");
                         }
-                        kolTweets.push(tweet);
-                        //twText = twText.concat("START_OF_TWEET_TEXT: [" + tweet.text + "] END_OF_TWEET_TEXT");
+                    } catch (error) {
+                        console.error("Error fetching tweets:", error);
                     }
                 }
                 console.log(kolTweets.length);
 
-                const prompt = `
+                const prompt =
+                    `
                 Here are some tweets/replied:
                     ${[...kolTweets]
                         .filter((tweet) => {
                             // ignore tweets where any of the thread tweets contain a tweet by the bot
                             const thread = tweet.thread;
                             const botTweet = thread.find(
-                                (t) => t.username === this.runtime.getSetting("TWITTER_USERNAME")
+                                (t) =>
+                                    t.username ===
+                                    this.runtime.getSetting("TWITTER_USERNAME")
                             );
                             return !botTweet;
                         })
@@ -171,7 +195,8 @@ export class TwitterWatchClient {
                             (tweet) => `
                     From: ${tweet.name} (@${tweet.username})
                     Text: ${tweet.text}`
-                ).join("\n")}
+                        )
+                        .join("\n")}
             
 Please find the token/project involved according to the text provided, and obtain the data of the number of interactions between each token and the three category of accounts (mentions/likes/comments/reposts/posts) in the tweets related to these tokens; mark the tokens as category 1, category 2 or category 3; if there are both category 1 and category 2, choose category 1, which has a higher priority.
  And provide the brief introduction of the key event for each token. And also skip the top/famous tokens.
@@ -180,8 +205,8 @@ Please reply in English and in the following format:
 - Token Interaction Category by json name 'category';
 - Token Interaction Count by json name 'count';
 - Token Key Event Introduction by json name 'event';
-Use the list format and only provide these 3 pieces of information.`
- + watcherCompletionFooter;
+Use the list format and only provide these 3 pieces of information.` +
+                    watcherCompletionFooter;
 
                 let response = await generateText({
                     runtime: this.runtime,
@@ -193,16 +218,27 @@ Use the list format and only provide these 3 pieces of information.`
             }
 
             // Consensus for All Nodes
-            let report = await InferMessageProvider.getLatestReport(this.runtime.cacheManager);
+            let report = await InferMessageProvider.getLatestReport(
+                this.runtime.cacheManager
+            );
             await this.consensus.pubMessage(report);
 
             // Post Tweet of myself
             let tweet = await this.inferMsgProvider.getAlphaText();
             console.log(tweet);
+
+            // Parse the tweet object
+            const tweetData = JSON.parse(tweet || `{}`);
+
+            // Send the tweet
             const result = await this.client.requestQueue.add(
                 async () =>
-                    await this.client.twitterClient.sendTweet(tweet)
+                    await this.client.twitterClient.sendTweet(
+                        tweetData?.text || ""
+                    )
             );
+
+            console.log("Tweet result:", result);
         } catch (error) {
             console.error("An error occurred:", error);
         }
