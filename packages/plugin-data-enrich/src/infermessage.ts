@@ -88,7 +88,7 @@ export class InferMessageProvider {
                         let alpha: WatchItem = {
                             token: item.token,
                             title: `${item.interact}, total ${item.count} times`,
-                            updateAt: new Date().toUTCString().replace(/:/g, "-"),
+                            updateAt: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
                             text: `${item.token}: ${item.event} \n${baseInfo}`,
                             //text: `${item.token}: ${item.event}`,
                         }
@@ -133,7 +133,13 @@ export class InferMessageProvider {
             );
             if (report) {
                 try {
-                    const json = JSON.stringify(report[0]);
+                    let index = Math.floor(
+                        Math.random() * (report.length - 1)
+                    );
+                    if (index < 0) {
+                        index = 0;
+                    }
+                    const json = JSON.stringify(report[index]);
                     if (json) {
                         return json;
                     }
