@@ -21,9 +21,11 @@ export const getEmbeddingConfig = () => ({
             ? 1536 // OpenAI
             : settings.USE_OLLAMA_EMBEDDING?.toLowerCase() === "true"
               ? 1024 // Ollama mxbai-embed-large
-              :settings.USE_GAIANET_EMBEDDING?.toLowerCase() === "true"
+              : settings.USE_GAIANET_EMBEDDING?.toLowerCase() === "true"
                 ? 1536 // GaiaNet
-                : 384, // BGE
+                : settings.USE_QWEN_EMBEDDING?.toLowerCase() === "true"
+                  ? 1536 // Qwen
+                  : 384, // BGE
     model:
         settings.USE_OPENAI_EMBEDDING?.toLowerCase() === "true"
             ? "text-embedding-3-small"
@@ -31,7 +33,9 @@ export const getEmbeddingConfig = () => ({
               ? settings.OLLAMA_EMBEDDING_MODEL || "mxbai-embed-large"
               : settings.USE_GAIANET_EMBEDDING?.toLowerCase() === "true"
                 ? settings.GAIANET_EMBEDDING_MODEL || "nomic-embed"
-                : "BGE-small-en-v1.5",
+                : settings.USE_QWEN_EMBEDDING?.toLowerCase() === "true"
+                  ? settings.QWEN_EMBEDDING_MODEL || "qwen-embedding"
+                  : "BGE-small-en-v1.5",
     provider:
         settings.USE_OPENAI_EMBEDDING?.toLowerCase() === "true"
             ? "OpenAI"
@@ -39,7 +43,9 @@ export const getEmbeddingConfig = () => ({
               ? "Ollama"
               : settings.USE_GAIANET_EMBEDDING?.toLowerCase() === "true"
                 ? "GaiaNet"
-                : "BGE",
+                : settings.USE_QWEN_EMBEDDING?.toLowerCase() === "true"
+                  ? "Qwen"
+                  : "BGE",
 });
 
 async function getRemoteEmbedding(
@@ -73,6 +79,8 @@ async function getRemoteEmbedding(
                 getEmbeddingConfig().dimensions, // Prefer dimensions, fallback to length
         }),
     };
+    console.log(requestOptions);
+    console.log(fullUrl);
 
     try {
         const response = await fetch(fullUrl, requestOptions);
@@ -104,12 +112,13 @@ export function getEmbeddingType(runtime: IAgentRuntime): "local" | "remote" {
 
     // Use local embedding if:
     // - Running in Node.js
-    // - Not using OpenAI provider
+    // - Not using OpenAI/GaiaNet/Qwen provider
     // - Not forcing OpenAI embeddings
     const isLocal =
         isNode &&
         runtime.character.modelProvider !== ModelProviderName.OPENAI &&
         runtime.character.modelProvider !== ModelProviderName.GAIANET &&
+        runtime.character.modelProvider !== ModelProviderName.QWEN &&
         !settings.USE_OPENAI_EMBEDDING;
 
     return isLocal ? "local" : "remote";
@@ -191,13 +200,24 @@ export async function embed(runtime: IAgentRuntime, input: string) {
         });
     }
 
-    if (config.provider=="GaiaNet") {
+    if (config.provider === "GaiaNet") {
         return await getRemoteEmbedding(input, {
             model: config.model,
             endpoint:
                 runtime.character.modelEndpointOverride ||
                 models[ModelProviderName.GAIANET].endpoint,
             apiKey: settings.GAIANET_API_KEY || runtime.token,
+            dimensions: config.dimensions,
+        });
+    }
+
+    if (config.provider === "Qwen") {
+        return await getRemoteEmbedding(input, {
+            model: config.model,
+            endpoint:
+                runtime.character.modelEndpointOverride ||
+                models[ModelProviderName.QWEN].endpoint,
+            apiKey: settings.QWEN_API_KEY || runtime.token,
             dimensions: config.dimensions,
         });
     }

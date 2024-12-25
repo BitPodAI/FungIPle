@@ -290,6 +290,11 @@ export function getTokenForProvider(
                 character.settings?.secrets?.VOLENGINE_API_KEY ||
                 settings.VOLENGINE_API_KEY
             );
+        case ModelProviderName.QWEN:
+            return (
+                character.settings?.secrets?.QWEN_API_KEY ||
+                settings.QWEN_API_KEY
+            );
     }
 }
 
