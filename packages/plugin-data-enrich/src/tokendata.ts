@@ -145,6 +145,8 @@ export class TokenDataProvider {
     static async fetchTokenInfo(token: string): Promise<string> {
         let output = `**Token Data**\n`;
         output += `Token: ${token}\n\n`;
+        token = token.replace('@', '');
+        token = token.replace('$', '');
         console.log(`fetchTokenInfo: ${token}`);
         try {
             const data = await TokenDataProvider.fetchWithRetry(
@@ -174,11 +176,12 @@ export class TokenDataProvider {
                 output += `\n`;
 
                 console.log("Formatted token data:", output);
+                return output;
             }
         } catch (error) {
             console.error("Error fetching data:", error);
         }
-        return output;
+        return "";
     }
 
     async fetchTokenSecurity(tokenSymbol: string): Promise<TokenSecurityData> {

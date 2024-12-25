@@ -9,10 +9,10 @@ var TokenAlphaText = [];
 const TOKEN_REPORT: string = "_token_report";
 const TOKEN_ALPHA_TEXT: string = "_token_alpha_text";
 
-//{ "token": "{{token}}", "category": {{category}}, "count": {{count}}, "event": {{event}} }
+//{ "token": "{{token}}", "interact": {{interact}}, "count": {{count}}, "event": {{event}} }
 interface InferMessage {
     token: string;
-    category: number;
+    interact: string;
     count: number;
     event: Text;
 }
@@ -67,13 +67,11 @@ export class InferMessageProvider {
             if (jsonArray) {
                 TokenAlphaReport = [];
                 TokenAlphaText = [];
-                var category = 4;
                 // Merge results
                 for (const item of jsonArray) {
                     const existingItem = await this.getCachedData<InferMessage>(item.token);
                     if (existingItem) {
-                        // Merge category & count
-                        item.category = Math.min(existingItem.category, item.category);
+                        // Merge interact & count
                         item.count += existingItem.count;
                         this.setCachedData(item.token, { ...item });
                         TokenAlphaReport.push(item);
@@ -84,13 +82,12 @@ export class InferMessageProvider {
                         }
                     }
 
-                    if (item.category < category) {
-                        category = item.category;
+                    if (true) {
                         let baseInfo = await TokenDataProvider.fetchTokenInfo(item.token);
                         //console.log(baseInfo);
                         let alpha: WatchItem = {
                             token: item.token,
-                            title: `KOLs mentioned/followed ${item.count} times`,
+                            title: `${item.interact}, total ${item.count} times`,
                             updateAt: new Date().toUTCString().replace(/:/g, "-"),
                             text: `${item.token}: ${item.event} \n${baseInfo}`,
                             //text: `${item.token}: ${item.event}`,

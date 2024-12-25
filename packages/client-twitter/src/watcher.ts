@@ -1,5 +1,4 @@
 import {
-    TOP_TOKENS,
     TW_KOL_1,
     TW_KOL_2,
     TW_KOL_3,
@@ -8,14 +7,31 @@ import {
     ConsensusProvider,
     InferMessageProvider,
 } from "@ai16z/plugin-data-enrich";
-import { ModelClass, IAgentRuntime } from "@ai16z/eliza";
-import { generateText } from "@ai16z/eliza";
+import {
+    generateText,
+    IAgentRuntime,
+    ModelClass,
+    settings,
+} from "@ai16z/eliza";
 import { ClientBase } from "./base";
-import * as path from "path";
+
+
+const WATCHER_INSTRUCTION = `
+Please find the following data according to the text provided in the following format:
+ (1) Token Symbol by json name "token";
+ (2) Token Interaction Information by json name "interact";
+ (3) Token Interaction Count by json name "count";
+ (4) Token Key Event Description by json name "event".
+The detail information of each item as following:
+ The (1) item is the token/coin/meme name involved in the text provided.
+ The (2) item include the interactions(mention/like/comment/repost/post/reply) between each token/coin/meme and the twitter account, the output is "@somebody mention/like/comment/repost/post/reply @token"; providing at most 2 interactions is enough.
+ The (3) item is the data of the count of interactions between each token and the twitter account.
+ The (4) item is the about 30 words description of the involved event for each token/coin/meme. If the description is too short, please attach the tweets.
+Use the list format and only provide these 4 pieces of information.`;
 
 export const watcherCompletionFooter = `\nResponse format should be formatted in a JSON block like this:
 [
-  { "token": "{{token}}", "category": {{category}}, "count": {{count}}, "event": {{event}} }
+  { "token": "{{token}}", "interact": {{interact}}, "count": {{count}}, "event": {{event}} }
 ]
 , and no other text should be provided.`;
 
@@ -45,29 +61,18 @@ Note that {{agentName}} is capable of reading/analysis various forms of text, in
 
 {{actions}}
 
-# Instructions: 
-Please find the token/project involved according to the text provided, and obtain the data of the number of interactions between each token and the three category of accounts (mentions/likes/comments/reposts/posts) in the tweets related to these tokens; mark the tokens as category 1, category 2 or category 3; if there are both category 1 and category 2, choose category 1, which has a higher priority.
- And provide the brief introduction of the key event for each token. And also skip the top/famous tokens.
-Please reply in Chinese and in the following format:
-- Token Symbol by json name 'token';
-- Token Interaction Category by json name 'category';
-- Token Interaction Count by json name 'count';
-- Token Key Event Introduction by json name 'event';
-Use the list format and only provide these 4 pieces of information.
+# Instructions:
+${settings.FUNGIPLE_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
 const GEN_TOKEN_REPORT_DELAY = 1000 * 60 * 60;
 const TWEET_TIMELINE = 60 * 60 * 6;
-const CACHE_KEY_TWITTER_WATCHER = "twitter_watcher_data";
-const CACHE_KEY_DATA_ITEM = "001";
 
 export class TwitterWatchClient {
     client: ClientBase;
     runtime: IAgentRuntime;
     consensus: ConsensusProvider;
     inferMsgProvider: InferMessageProvider;
-
-    private cacheKey: string = CACHE_KEY_TWITTER_WATCHER;
 
     constructor(client: ClientBase, runtime: IAgentRuntime) {
         this.client = client;
@@ -76,38 +81,6 @@ export class TwitterWatchClient {
         this.inferMsgProvider = new InferMessageProvider(
             this.runtime.cacheManager
         );
-    }
-
-    private async readFromCache<T>(key: string): Promise<T | null> {
-        const cached = await this.runtime.cacheManager.get<T>(
-            path.join(this.cacheKey, key)
-        );
-        return cached;
-    }
-
-    private async writeToCache<T>(key: string, data: T): Promise<void> {
-        await this.runtime.cacheManager.set(
-            path.join(this.cacheKey, key),
-            data,
-            {
-                expires: Date.now() + 5 * 60 * 60 * 1000,
-            }
-        );
-    }
-
-    private async getCachedData<T>(key: string): Promise<T | null> {
-        // Check file-based cache
-        const fileCachedData = await this.readFromCache<T>(key);
-        if (fileCachedData) {
-            return fileCachedData;
-        }
-
-        return null;
-    }
-
-    private async setCachedData<T>(cacheKey: string, data: T): Promise<void> {
-        // Write to file-based cache
-        await this.writeToCache(cacheKey, data);
     }
 
     async start() {
@@ -169,7 +142,6 @@ export class TwitterWatchClient {
                                 continue; // Skip the outdates.
                             }
                             kolTweets.push(tweet);
-                            //twText = twText.concat("START_OF_TWEET_TEXT: [" + tweet.text + "] END_OF_TWEET_TEXT");
                         }
                     } catch (error) {
                         console.error("Error fetching tweets:", error);
@@ -194,19 +166,13 @@ export class TwitterWatchClient {
                         .map(
                             (tweet) => `
                     From: ${tweet.name} (@${tweet.username})
-                    Text: ${tweet.text}`
-                        )
+                    Text: ${tweet.text}\n
+                    Likes: ${tweet.likes}, Replies: ${tweet.replies}, Retweets: ${tweet.retweets},
+                        `)
                         .join("\n")}
-            
-Please find the token/project involved according to the text provided, and obtain the data of the number of interactions between each token and the three category of accounts (mentions/likes/comments/reposts/posts) in the tweets related to these tokens; mark the tokens as category 1, category 2 or category 3; if there are both category 1 and category 2, choose category 1, which has a higher priority.
- And provide the brief introduction of the key event for each token. And also skip the top/famous tokens.
-Please reply in English and in the following format:
-- Token Symbol by json name 'token';
-- Token Interaction Category by json name 'category';
-- Token Interaction Count by json name 'count';
-- Token Key Event Introduction by json name 'event';
-Use the list format and only provide these 3 pieces of information.` +
-                    watcherCompletionFooter;
+                ${settings.FUNGIPLE_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}` +
+                watcherCompletionFooter;
+                //console.log(prompt);
 
                 let response = await generateText({
                     runtime: this.runtime,
