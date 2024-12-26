@@ -376,24 +376,6 @@ export const models: Models = {
             [ModelClass.EMBEDDING]: "doubao-embedding",
         },
     },
-    [ModelProviderName.QWEN]: {
-        endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-        settings: {
-            stop: [],
-            maxInputTokens: 128000,
-            maxOutputTokens: 8192,
-            frequency_penalty: 0.4,
-            presence_penalty: 0.4,
-            temperature: 0.7
-        },
-        model: {
-            [ModelClass.SMALL]: "qwen-turbo",           // 7B 模型
-            [ModelClass.MEDIUM]: "qwen-plus",           // 14B 模型
-            [ModelClass.LARGE]: "qwen-max",             // 72B 模型
-            [ModelClass.EMBEDDING]: "text-embedding-v1", // 通义千问 Embedding 模型
-            [ModelClass.IMAGE]: "qwen-vl-plus"          // 通义千问视觉语言模型
-        }
-    }
 };
 
 export function getModel(provider: ModelProviderName, type: ModelClass) {

@@ -431,32 +431,6 @@ export async function generateText({
                 break;
             }
 
-            case ModelProviderName.QWEN: {
-                elizaLogger.debug("Initializing Qwen model.");
-                const qwen = createOpenAI({ 
-                    apiKey, 
-                    baseURL: endpoint,
-                    //defaultHeaders: models[ModelProviderName.QWEN].headers
-                });
-
-                const { text: qwenResponse } = await aiGenerateText({
-                    model: qwen.languageModel(model),
-                    prompt: context,
-                    system:
-                        runtime.character.system ??
-                        settings.SYSTEM_PROMPT ??
-                        undefined,
-                    temperature: temperature,
-                    maxTokens: max_response_length,
-                    frequencyPenalty: frequency_penalty,
-                    presencePenalty: presence_penalty,
-                });
-
-                response = qwenResponse;
-                elizaLogger.debug("Received response from Qwen model.");
-                break;
-            }
-
             default: {
                 const errorMessage = `Unsupported provider: ${provider}`;
                 elizaLogger.error(errorMessage);
@@ -1228,8 +1202,6 @@ export async function handleProvider(
             return await handleOpenRouter(options);
         case ModelProviderName.OLLAMA:
             return await handleOllama(options);
-        case ModelProviderName.QWEN:
-            return await handleQwen(options);
         default: {
             const errorMessage = `Unsupported provider: ${provider}`;
             elizaLogger.error(errorMessage);
@@ -1444,36 +1416,6 @@ async function handleOllama({
     const ollama = ollamaProvider(model);
     return await aiGenerateObject({
         model: ollama,
-        schema,
-        schemaName,
-        schemaDescription,
-        mode,
-        ...modelOptions,
-    });
-}
-
-/**
- * Handles object generation for Qwen models.
- *
- * @param {ProviderOptions} options - Options specific to Qwen.
- * @returns {Promise<GenerateObjectResult<unknown>>} - A promise that resolves to generated objects.
- */
-async function handleQwen({
-    model,
-    apiKey,
-    schema,
-    schemaName,
-    schemaDescription,
-    mode,
-    modelOptions,
-}: ProviderOptions): Promise<GenerateObjectResult<unknown>> {
-    const qwen = createOpenAI({ 
-        apiKey, 
-        baseURL: models.qwen.endpoint,
-        //defaultHeaders: models[ModelProviderName.QWEN].headers
-    });
-    return await aiGenerateObject({
-        model: qwen.languageModel(model),
         schema,
         schemaName,
         schemaDescription,
