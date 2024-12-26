@@ -88,7 +88,7 @@ export class InferMessageProvider {
                         let alpha: WatchItem = {
                             token: item.token,
                             title: `${item.interact}, total ${item.count} times`,
-                            updateAt: new Date().toISOString().slice(0, 16),
+                            updateAt: new Date().toISOString().slice(0, 16).replace(/T/g, ' '),
                             text: `${item.token}: ${item.event} \n${baseInfo}`,
                             //text: `${item.token}: ${item.event}`,
                         }
