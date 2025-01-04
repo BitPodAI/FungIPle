@@ -2,7 +2,7 @@ import express from "express";
 import { DirectClient } from "./index";
 import { Scraper } from "agent-twitter-client";
 import { generateText, ModelClass, stringToUuid } from "@ai16z/eliza";
-import { Memory } from "@ai16z/eliza";
+import { Memory, settings } from "@ai16z/eliza";
 import { AgentConfig } from "../../../agent/src";
 import {
     QUOTES_LIST,
@@ -11,6 +11,7 @@ import {
     InferMessageProvider,
     tokenWatcherConversationTemplate,
 } from "@ai16z/plugin-data-enrich";
+import { TwitterApi } from 'twitter-api-v2';
 
 import { callSolanaAgentTransfer } from "./solanaagentkit";
 
@@ -35,6 +36,13 @@ interface UserProfile {
     experience: number;
     nextLevelExp: number;
     points: number;
+    tweetProfile?: {
+        code: string;
+        codeVerifier: string;
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+    };
     tweetFrequency: {
         dailyLimit: number;
         currentCount: number;
@@ -240,6 +248,13 @@ class AuthUtils {
             experience: 0,
             nextLevelExp: 1000,
             points: 0,
+            tweetProfile: {
+                code: "",
+                codeVerifier: "",
+                accessToken: "",
+                refreshToken: "",
+                expiresIn: 0,
+            },
             tweetFrequency: {
                 dailyLimit: 10,
                 currentCount: 0,
@@ -284,6 +299,8 @@ export class Routes {
 
     setupRoutes(app: express.Application): void {
         app.post("/:agentId/login", this.handleLogin.bind(this));
+        app.get("/:agentId/twitter_oauth_init", this.handleTwitterOauthInit.bind(this));
+        app.get("/:agentId/twitter_oauth_callback", this.handleTwitterOauthCallback.bind(this));
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post("/:agentId/profile", this.handleProfileQuery.bind(this));
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
@@ -347,6 +364,195 @@ export class Routes {
                 twitterProfile,
             };
         });
+    }
+
+    async handleTwitterOauthInit(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const client = new TwitterApi({
+                clientId: settings.TWITTER_CLIENT_ID,
+                clientSecret: settings.TWITTER_CLIENT_SECRET,
+            });
+            
+            const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
+                `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback`,
+                {
+                  scope: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+                }
+            );
+            
+            // Save state & codeVerifier
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            await runtime.cacheManager.set("oauth_verifier", JSON.stringify({
+                codeVerifier,
+                state,
+                timestamp: Date.now()
+            }), {
+                expires: Date.now() + 2* 60 * 60 * 1000,
+            });
+            //await runtime.databaseAdapter?.setCache({
+            //    agentId: state,
+            //    key: 'oauth_verifier',
+            //    value: JSON.stringify({
+            //        codeVerifier,
+            //        state,
+            //        timestamp: Date.now()
+            //    }),
+            //    ttl: 3600 // 1hour
+            //});
+            
+            return { url, state };
+        });
+    }
+
+    async handleTwitterOauthCallback(req: express.Request, res: express.Response) {
+        //return this.authUtils.withErrorHandling(req, res, async () => {
+            // 1. Get code and state
+            const { code, state } = req.query;
+
+            if (!code || !state) {
+                res.status(200).json({ ok: true });
+                return;
+                //throw new ApiError(400, "Missing required OAuth parameters");
+            }
+
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            
+            const verifierData = await runtime.cacheManager.get("oauth_verifier");
+
+            if (!verifierData) {
+                // error
+                console.error(`OAuth verification failed - State: ${state}, No verifier data found`);
+                throw new ApiError(400, "OAuth session expired or invalid. Please try authenticating again.");
+            }
+
+            const { codeVerifier, timestamp } = JSON.parse(verifierData);
+
+            try {
+                const client = new TwitterApi({
+                    clientId: settings.TWITTER_CLIENT_ID,
+                    clientSecret: settings.TWITTER_CLIENT_SECRET,
+                });
+
+                const {
+                    accessToken,
+                    refreshToken,
+                    expiresIn
+                } = await client.loginWithOAuth2({
+                    code,
+                    codeVerifier,
+                    redirectUri: `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback`,
+                });
+
+                // Clear
+                await runtime.databaseAdapter?.deleteCache({
+                    agentId: state,
+                    key: 'oauth_verifier'
+                });
+
+                // Save twitter profile
+                // TODO: encrypt token
+                const userId = req.params.agentId;
+                const userProfile = this.authUtils.createDefaultProfile(
+                    "",
+                    ""
+                );
+                userProfile.tweetProfile = {
+                    code,
+                    codeVerifier,
+                    accessToken,
+                    refreshToken,
+                    expiresIn
+                };
+                console.log("userProfile is", userProfile);
+                console.log("userId is", userId);
+                await runtime.cacheManager.set("userProfile", JSON.stringify(userProfile), {
+                    expires: Date.now() + 2 * 60 * 60 * 1000,
+                });
+                console.log("userProfile set");
+                /*await this.authUtils.saveUserData(
+                    userId,
+                    runtime,
+                    { username: "", email: "", password: "" },
+                    userProfile
+                );*/
+
+                //return { accessToken };
+                res.send(`
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                        <meta charset="UTF-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>FungIPle</title>
+                        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTczIiBoZWlnaHQ9IjE2MyIgdmlld0JveD0iMCAwIDE3MyAxNjMiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0wIDEwNi44OUgxOS4yMDM1TDE5LjIzMzYgNzcuNDYwOUgwLjAzMDA3NkwwIDEwNi44OVoiIGZpbGw9IiNGRjk5MDAiLz4KPHBhdGggZD0iTTE3Mi45NTIgMjkuNDI5NUwxNzIuOTY3IDE5LjcxNDlDMTcyLjk2NyA5LjUxOTA5IDE2My4yNjggMCAxNTIuODYyIDBIODMuNzkyMkg4MS43OTIxSDc0LjQzODZINzMuOTQyM1YwLjAxNTAzODFDNjAuMDQ3MiAwLjI0MDYwOSA1MC4wOTIxIDEwLjEzNTcgNTAuMDc3IDIzLjg1MDRMNTAuMDE2OSA3Ny40NjExSDI5LjU2NTJMMjkuNTM1MiAxMDYuODkxSDQ5Ljk4NjhMNDkuOTI2NyAxNjIuNjIySDgzLjY4NjlMODMuNzQ3MSAxMDYuODkxSDgzLjc3NzJIMTQ4LjUzMUMxNjIuNjgxIDEwNi44OTEgMTcyLjg3NyA5Ni45MDUzIDE3Mi44OTIgODMuMDQwMkwxNzIuOTM3IDQxLjQ2NzJIMTM5LjE3N0wxMzkuMTMyIDc3LjQ2MTFIODMuNzkyMlYyOS40Mjk1SDEzOS4xOTJIMTcyLjk1MloiIGZpbGw9IiNGRjk5MDAiLz4KPC9zdmc+Cg==">
+                        <style>
+                            body {
+                                margin: 0;
+                            }
+                            .container {
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                width: 100vw;
+                            }
+                            .ad_img {
+                                max-width: 1000px;
+                                width: 100%;
+                                height: auto;
+                            }
+                            @media only screen and (max-width: 670px) {
+                                .ad_img {
+                                    max-width: 660px;
+                                    width: 100%;
+                                    height: auto;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div style="text-align: center; font-size: 20px; font-weight: bold;">
+                            <h1>FungIPle Agent</h1>
+                            <br>Login Success!<br>
+                            <script type="text/javascript">
+                                console.log('window.opener');
+                                console.log(window.opener);
+                                function closeWindow() {
+                                    console.log('closeWindow');
+                                    try {
+                                        window.opener.postMessage({
+                                            type: 'TWITTER_AUTH_SUCCESS',
+                                            code: '${code}',
+                                            state: '${state}'
+                                        },
+                                        '*'
+                                        );
+                                        window.close();
+                                    } catch(e) {
+                                        console.log(e);
+                                    }
+                                }
+                            </script>
+                            <button style="text-align: center; width: 40%; height: 40px; font-size: 20px; background-color: #9F91ED; color: #ffffff; margin: 20px; border: none; border-radius: 10px;" 
+                                onclick="closeWindow()">
+                                Click to Close</button>
+                            <br>        
+                        </div>
+                        <div class="container">
+                            <img style="max-width: 40%; width: 40%; height: auto;" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTczIiBoZWlnaHQ9IjE2MyIgdmlld0JveD0iMCAwIDE3MyAxNjMiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0wIDEwNi44OUgxOS4yMDM1TDE5LjIzMzYgNzcuNDYwOUgwLjAzMDA3NkwwIDEwNi44OVoiIGZpbGw9IiNGRjk5MDAiLz4KPHBhdGggZD0iTTE3Mi45NTIgMjkuNDI5NUwxNzIuOTY3IDE5LjcxNDlDMTcyLjk2NyA5LjUxOTA5IDE2My4yNjggMCAxNTIuODYyIDBIODMuNzkyMkg4MS43OTIxSDc0LjQzODZINzMuOTQyM1YwLjAxNTAzODFDNjAuMDQ3MiAwLjI0MDYwOSA1MC4wOTIxIDEwLjEzNTcgNTAuMDc3IDIzLjg1MDRMNTAuMDE2OSA3Ny40NjExSDI5LjU2NTJMMjkuNTM1MiAxMDYuODkxSDQ5Ljk4NjhMNDkuOTI2NyAxNjIuNjIySDgzLjY4NjlMODMuNzQ3MSAxMDYuODkxSDgzLjc3NzJIMTQ4LjUzMUMxNjIuNjgxIDEwNi44OTEgMTcyLjg3NyA5Ni45MDUzIDE3Mi44OTIgODMuMDQwMkwxNzIuOTM3IDQxLjQ2NzJIMTM5LjE3N0wxMzkuMTMyIDc3LjQ2MTFIODMuNzkyMlYyOS40Mjk1SDEzOS4xOTJIMTcyLjk1MloiIGZpbGw9IiNGRjk5MDAiLz4KPC9zdmc+Cg==">
+                        </div>
+
+                        <div>
+                            <br>
+                        </div>
+
+                    </body>
+                </html>`);
+            } catch (error) {
+                console.error("Error during OAuth callback:", error);
+                //throw new ApiError(500, "Internal server error");
+                res.status(500).json({ error: "Internal server error" });
+            }
+        //});
     }
 
     async handleProfileUpdate(req: express.Request, res: express.Response) {
@@ -579,6 +785,9 @@ export class Routes {
                 }
                 response = response.replaceAll("```", "");
                 response = response.replace("json", "");
+
+                // TODO
+                //
 
                 return { response };
             } catch (error) {

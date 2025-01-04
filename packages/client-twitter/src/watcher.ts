@@ -14,6 +14,7 @@ import {
     settings,
 } from "@ai16z/eliza";
 import { ClientBase } from "./base";
+import { TwitterApi } from 'twitter-api-v2';
 
 
 const WATCHER_INSTRUCTION = `
@@ -99,7 +100,6 @@ export class TwitterWatchClient {
                     this.runtime.getSetting("TWITTER_USERNAME") +
                     "/lastGen"
             );
-            console.log(lastGen);
 
             const lastGenTimestamp = lastGen?.timestamp ?? 0;
             if (Date.now() > lastGenTimestamp + GEN_TOKEN_REPORT_DELAY) {
@@ -118,7 +118,6 @@ export class TwitterWatchClient {
     }
 
     async fetchTokens() {
-        console.log("TwitterWatcher fetchTokens");
         let fetchedTokens = new Map();
 
         try {
@@ -126,7 +125,6 @@ export class TwitterWatchClient {
             const timeline =
                 Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
             for (const kolList of [TW_KOL_1, TW_KOL_2, TW_KOL_3]) {
-                //let twText = "";
                 let kolTweets = [];
                 for (const kol of kolList) {
                     //console.log(kol.substring(1));
@@ -192,22 +190,58 @@ export class TwitterWatchClient {
             // Post Tweet of myself
             let tweet = await this.inferMsgProvider.getAlphaText();
             console.log(tweet);
+            await this.sendTweet(tweet);
+        } catch (error) {
+            console.error("An error occurred:", error);
+        }
+        return fetchedTokens;
+    }
 
+    async sendTweet(tweet: string) {
+        console.log("TwitterWatcher sendTweet");
+        try {
             // Parse the tweet object
             const tweetData = JSON.parse(tweet || `{}`);
 
-            // Send the tweet
+            const cached = await this.runtime.cacheManager.get("userProfile");
+            if (cached) {
+                // Login with v2
+                const profile = JSON.parse(cached);
+                if (profile.tweetProfile.accessToken) {
+                    // New Twitter API v2 by access token
+                    const twitterClient = new TwitterApi(profile.tweetProfile.accessToken);
+
+                    // Check if the client is working
+                    const me = await twitterClient.v2.me();
+                    console.log('OAuth2 Success:', me.data);
+                    if (me.data) {
+                        const tweetResponse = await twitterClient.v2.tweet({text: tweetData.text});
+                        console.log('Tweet result:', tweetResponse);
+                    }
+
+                    // Login with v2
+                    /*const auth = new TwitterGuestAuth(bearerToken);
+                    auth.loginWithV2AndOAuth2(profile.tweetProfile.accessToken);
+                    const v2Client = auth.getV2Client();
+                    if (v2Client) {
+                        const me = await v2Client.v2.me();
+                        console.log('OAuth2 Success:', me.data);
+                        createCreateTweetRequestV2(tweetData.text, auth);
+                    }*/
+                    return;
+                }
+            }
+
+            // Send the tweet self if no OAuth2
             const result = await this.client.requestQueue.add(
                 async () =>
                     await this.client.twitterClient.sendTweet(
                         tweetData?.text || ""
                     )
             );
-
             console.log("Tweet result:", result);
         } catch (error) {
-            console.error("An error occurred:", error);
+            console.error("sendTweet error: ", error);
         }
-        return fetchedTokens;
     }
 }
