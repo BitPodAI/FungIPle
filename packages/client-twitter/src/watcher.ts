@@ -63,7 +63,7 @@ Note that {{agentName}} is capable of reading/analysis various forms of text, in
 {{actions}}
 
 # Instructions:
-${settings.FUNGIPLE_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
+${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
 const GEN_TOKEN_REPORT_DELAY = 1000 * 60 * 60 * 2;
@@ -168,7 +168,7 @@ export class TwitterWatchClient {
                     Likes: ${tweet.likes}, Replies: ${tweet.replies}, Retweets: ${tweet.retweets},
                         `)
                         .join("\n")}
-                ${settings.FUNGIPLE_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}` +
+                ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}` +
                 watcherCompletionFooter;
                 //console.log(prompt);
 

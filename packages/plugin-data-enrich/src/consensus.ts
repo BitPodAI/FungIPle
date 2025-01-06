@@ -14,8 +14,8 @@ import { Tweet } from "agent-twitter-client";
 import { InferMessageProvider } from './infermessage';
 
 
-const TOPIC_TWEET = 'fungiple-tweet';
-const TOPIC_INFER_MESSAGE = 'fungiple-infer-message';
+const TOPIC_TWEET = 'web3agent-tweet';
+const TOPIC_INFER_MESSAGE = 'web3agent-infer-message';
 const CONSENSUS_PORT = 3011;
 
 interface Content {
