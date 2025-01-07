@@ -770,7 +770,8 @@ export class Routes {
         return this.authUtils.withErrorHandling(req, res, async () => {
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             const prompt =
-                `Here are user input content:
+                `Your name is ${req.body.name || runtime.character.name},
+                Here are user input content:
             ${req.body.text}` + tokenWatcherConversationTemplate;
 
             try {
