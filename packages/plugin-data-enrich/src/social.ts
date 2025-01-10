@@ -3,36 +3,36 @@ import { Scraper } from "agent-twitter-client";
 
 // Pre Defined Twitter KOL
 export const TW_KOL_1 = [
-    "@jessepollak",
-    "@elonmusk",
-    "@cz_binance",
-    "@0xRodney",
-    "@Buddy",
-    "@DavidAirey",
-    "@alex_fazel",
+    "jessepollak",
+    "elonmusk",
+    "cz_binance",
+    "0xRodney",
+    "Buddy",
+    "DavidAirey",
+    "alex_fazel",
 ];
 
 export const TW_KOL_2 = [
-    "@aeyakovenko",
-    "@heyibinance",
-    "@CryptoHayes",
-    "@rajgokal",
-    "@CryptoDaku_",
-    "@healthy_pockets",
-    "@StackerSatoshi",
-    "@TheCryptoLark",
-    "@CryptoTony__",
+    "aeyakovenko",
+    "heyibinance",
+    "CryptoHayes",
+    "rajgokal",
+    "CryptoDaku_",
+    "healthy_pockets",
+    "StackerSatoshi",
+    "TheCryptoLark",
+    "CryptoTony__",
 ];
 
 export const TW_KOL_3 = [
-    "@jayendra_jog",
-    "@therealchaseeb",
-    "@jacobvcreech",
-    "@gavofyork",
-    "@lordjorx",
-    "@Haskell_Gz",
-    "@Overdose_AI",
-    "@KriptoErs",
+    "jayendra_jog",
+    "therealchaseeb",
+    "jacobvcreech",
+    "gavofyork",
+    "lordjorx",
+    "Haskell_Gz",
+    "Overdose_AI",
+    "KriptoErs",
 ];
 
 export const STYLE_LIST = [

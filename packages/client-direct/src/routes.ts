@@ -305,7 +305,7 @@ export class Routes {
         app.post("/:agentId/profile", this.handleProfileQuery.bind(this));
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
         app.get("/:agentId/config", this.handleConfigQuery.bind(this));
-        app.get("/:agentId/watch", this.handleWatchText.bind(this));
+        app.post("/:agentId/watch", this.handleWatchText.bind(this));
         app.post("/:agentId/chat", this.handleChat.bind(this));
         app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
         app.post(
@@ -443,6 +443,15 @@ export class Routes {
                     redirectUri: `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback`,
                 });
 
+                let username = "";
+                let email = "";
+                const me = await client.v2.me();
+                console.log("me is", me);
+                if (me?.data) {
+                    username = me.data.username;
+                    email = me.data.email;
+                }
+
                 // Clear
                 await runtime.databaseAdapter?.deleteCache({
                     agentId: state,
@@ -463,18 +472,17 @@ export class Routes {
                     refreshToken,
                     expiresIn
                 };
-                console.log("userProfile is", userProfile);
-                console.log("userId is", userId);
-                await runtime.cacheManager.set("userProfile", JSON.stringify(userProfile), {
-                    expires: Date.now() + 2 * 60 * 60 * 1000,
-                });
-                console.log("userProfile set");
-                /*await this.authUtils.saveUserData(
+
+                //await runtime.cacheManager.set("userProfile", JSON.stringify(userProfile), {
+                //    expires: Date.now() + 2 * 60 * 60 * 1000,
+                //});
+
+                await this.authUtils.saveUserData(
                     userId,
                     runtime,
-                    { username: "", email: "", password: "" },
+                    { username, email, password: "" },
                     userProfile
-                );*/
+                );
 
                 //return { accessToken };
                 res.send(`
@@ -681,8 +689,8 @@ export class Routes {
                 ...profile,
                 prompt,
                 name,
-                clients: ["direct"],
-                modelProvider: "openai",
+                clients: ["twitter"],
+                modelProvider: "redpill",
                 bio: Array.isArray(profile.bio)
                     ? profile.bio
                     : [profile.bio || `I am ${name}`],
@@ -745,7 +753,7 @@ export class Routes {
             );
             return {
                 styles: STYLE_LIST,
-                kols: TW_KOL_1,
+                kols: settings.TW_KOL_LIST || TW_KOL_1,
                 quote: QUOTES_LIST[quoteIndex],
             };
         });
@@ -755,10 +763,11 @@ export class Routes {
         return this.authUtils.withErrorHandling(req, res, async () => {
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             try {
-                const report = await InferMessageProvider.getReportText(
-                    runtime.cacheManager
+                const { cursor } = req.body;
+                const report = await InferMessageProvider.getAllWatchItemsPaginated(
+                    runtime.cacheManager, cursor
                 );
-                return { report };
+                return { watchlist: report };
             } catch (error) {
                 console.error("Error fetching token data:", error);
                 return { report: "Watcher is in working, please wait." };

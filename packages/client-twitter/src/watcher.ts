@@ -1,9 +1,5 @@
 import {
     TW_KOL_1,
-    TW_KOL_2,
-    TW_KOL_3,
-} from "@ai16z/plugin-data-enrich";
-import {
     ConsensusProvider,
     InferMessageProvider,
 } from "@ai16z/plugin-data-enrich";
@@ -25,9 +21,10 @@ Please find the following data according to the text provided in the following f
  (4) Token Key Event Description by json name "event".
 The detail information of each item as following:
  The (1) item is the token/coin/meme name involved in the text provided.
- The (2) item include the interactions(mention/like/comment/repost/post/reply) between each token/coin/meme and the twitter account, the output is "@somebody mention/like/comment/repost/post/reply @token"; providing at most 2 interactions is enough.
+ The (2) item include the interactions(mention/like/comment/repost/post/reply) between each token/coin/meme and the twitter account, the output is "@somebody mention/like/comment/repost/post/reply @token, @someone post @token, etc."; providing at most 2 interactions is enough.
  The (3) item is the data of the count of interactions between each token and the twitter account.
  The (4) item is the about 30 words description of the involved event for each token/coin/meme. If the description is too short, please attach the tweets.
+Please skip the top token, such as btc, eth, sol, base, bnb.
 Use the list format and only provide these 4 pieces of information.`;
 
 export const watcherCompletionFooter = `\nResponse format should be formatted in a JSON block like this:
@@ -66,8 +63,9 @@ Note that {{agentName}} is capable of reading/analysis various forms of text, in
 ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
-const GEN_TOKEN_REPORT_DELAY = 1000 * 60 * 60 * 2;
-const TWEET_TIMELINE = 60 * 60 * 6;
+const TWEET_COUNT_PER_TIME = 20;      //count related to timeline
+const TWEET_TIMELINE = 60 * 60 * 8;   //timeline related to count
+const GEN_TOKEN_REPORT_DELAY = 1000 * TWEET_TIMELINE;
 
 export class TwitterWatchClient {
     client: ClientBase;
@@ -117,6 +115,11 @@ export class TwitterWatchClient {
         genReportLoop();
     }
 
+    getKolList() {
+        // TODO: Should be a unipool shared by all users.
+        return JSON.parse(settings.TW_KOL_LIST) || TW_KOL_1;
+    }
+
     async fetchTokens() {
         let fetchedTokens = new Map();
 
@@ -124,28 +127,29 @@ export class TwitterWatchClient {
             const currentTime = new Date();
             const timeline =
                 Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
-            for (const kolList of [TW_KOL_1, TW_KOL_2, TW_KOL_3]) {
+            const kolList = this.getKolList();
+            for (const kol of kolList) {
                 let kolTweets = [];
-                for (const kol of kolList) {
-                    //console.log(kol.substring(1));
-                    let tweets =
-                        await this.client.twitterClient.getTweetsAndReplies(
-                            kol.substring(1),
-                            60
-                        );
-                    // Fetch and process tweets
-                    try {
-                        for await (const tweet of tweets) {
-                            if (tweet.timestamp < timeline) {
-                                continue; // Skip the outdates.
-                            }
-                            kolTweets.push(tweet);
+                let tweets =
+                    await this.client.twitterClient.getTweetsAndReplies(
+                        kol, TWEET_COUNT_PER_TIME);
+                // Fetch and process tweets
+                try {
+                    for await (const tweet of tweets) {
+                        if (tweet.timestamp < timeline) {
+                            continue; // Skip the outdates.
                         }
-                    } catch (error) {
-                        console.error("Error fetching tweets:", error);
+                        kolTweets.push(tweet);
                     }
+                } catch (error) {
+                    console.error("Error fetching tweets:", error);
+                    console.log(`kol ${kol} not found`);
+                    continue;
                 }
                 console.log(kolTweets.length);
+                if (kolTweets.length < 1) {
+                    continue;
+                }
 
                 const prompt =
                     `
@@ -175,10 +179,10 @@ export class TwitterWatchClient {
                 let response = await generateText({
                     runtime: this.runtime,
                     context: prompt,
-                    modelClass: ModelClass.MEDIUM,
+                    modelClass: ModelClass.LARGE,
                 });
                 console.log(response);
-                await this.inferMsgProvider.addInferMessage(response);
+                await this.inferMsgProvider.addInferMessage(kol, response);
             }
 
             // Consensus for All Nodes
@@ -188,9 +192,10 @@ export class TwitterWatchClient {
             await this.consensus.pubMessage(report);
 
             // Post Tweet of myself
-            let tweet = await this.inferMsgProvider.getAlphaText();
+            //let tweet = await this.inferMsgProvider.getAlphaText();
+            let tweet = await InferMessageProvider.getAllWatchItemsPaginated(this.runtime.cacheManager);
             console.log(tweet);
-            await this.sendTweet(tweet);
+            await this.sendTweet(JSON.stringify(tweet?.items[0]));
         } catch (error) {
             console.error("An error occurred:", error);
         }
@@ -198,9 +203,9 @@ export class TwitterWatchClient {
     }
 
     async sendTweet(tweet: string) {
-        console.log("TwitterWatcher sendTweet");
         try {
             // Parse the tweet object
+            //const tweetData = JSON.parse(tweet || `{}`);
             const tweetData = JSON.parse(tweet || `{}`);
 
             const cached = await this.runtime.cacheManager.get("userProfile");
