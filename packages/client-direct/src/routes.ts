@@ -43,6 +43,12 @@ interface UserProfile {
         refreshToken: string;
         expiresIn: number;
     };
+    twitterWatchList: [
+        {
+            username: string;
+            tabs: string[];
+        }
+    ];
     tweetFrequency: {
         dailyLimit: number;
         currentCount: number;
@@ -301,6 +307,7 @@ export class Routes {
         app.post("/:agentId/login", this.handleLogin.bind(this));
         app.get("/:agentId/twitter_oauth_init", this.handleTwitterOauthInit.bind(this));
         app.get("/:agentId/twitter_oauth_callback", this.handleTwitterOauthCallback.bind(this));
+        app.post("/:agentId/twitter_profile_search", this.handleTwitterProfileSearch.bind(this));
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post("/:agentId/profile", this.handleProfileQuery.bind(this));
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
@@ -561,6 +568,61 @@ export class Routes {
                 res.status(500).json({ error: "Internal server error" });
             }
         //});
+    }
+
+    async handleTwitterProfileSearch(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const { username, count } = req.body;
+            const fetchCount = Math.min(20, count);
+            
+            try {
+                let profiles = [];
+                const scraper = new Scraper();
+                try {
+                    await scraper.login(
+                        settings.TWITTER_USERNAME,
+                        settings.TWITTER_PASSWORD,
+                        settings.TWITTER_EMAIL
+                    );
+
+                    if (!(await scraper.isLoggedIn())) {
+                        throw new ApiError(401, "Twitter process failed");
+                    }
+
+                    const response = await scraper.searchProfiles(username, count);
+                    for await (const profile of response) {
+                        profiles.push(profile);
+                    }
+                } finally {
+                    await scraper.logout();
+                }
+                /*const promise = new Promise((resolve, reject) => {
+                    // Listen
+                    twEventCenter.on('MSG_SEARCH_TWITTER_PROFILE_RESP', (data) => {
+                        console.log('Received Resp message:', data);
+                        profiles = data;
+
+                        // get result
+                        resolve(profiles);
+                    });
+
+                    // set request
+                    twEventCenter.emit('MSG_SEARCH_TWITTER_PROFILE', { username, count: fetchCount });
+                    console.log("Send search request");
+                });
+
+                // wait for result
+                const result = await promise;
+                return { profiles: result };*/
+                return profiles;
+            } catch (error) {
+                console.error("Profile search error:", error);
+                return res.status(500).json({
+                    success: false,
+                    error: "User search error",
+                });
+            }
+        });
     }
 
     async handleProfileUpdate(req: express.Request, res: express.Response) {
