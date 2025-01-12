@@ -19,6 +19,7 @@ import { InvalidPublicKeyError } from "./solana";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTokenTransferTransaction } from "./solana";
+import { requireAuth } from "./auth";
 
 interface TwitterCredentials {
     username: string;
@@ -318,7 +319,11 @@ export class Routes {
             this.handleTwitterProfileSearch.bind(this)
         );
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
-        app.post("/:agentId/profile", this.handleProfileQuery.bind(this));
+        app.post(
+            "/:agentId/profile",
+            requireAuth,
+            this.handleProfileQuery.bind(this)
+        );
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
         app.get("/:agentId/config", this.handleConfigQuery.bind(this));
         app.post("/:agentId/watch", this.handleWatchText.bind(this));
