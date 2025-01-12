@@ -8,6 +8,7 @@ import {
     QUOTES_LIST,
     STYLE_LIST,
     TW_KOL_1,
+    UserManager,
     InferMessageProvider,
     tokenWatcherConversationTemplate,
 } from "@ai16z/plugin-data-enrich";
@@ -24,50 +25,6 @@ interface TwitterCredentials {
     username: string;
     password: string;
     email: string;
-}
-
-interface UserProfile {
-    username: string;
-    email: string;
-    avatar?: string;
-    bio?: string | string[];
-    walletAddress?: string;
-    level: number;
-    experience: number;
-    nextLevelExp: number;
-    points: number;
-    tweetProfile?: {
-        code: string;
-        codeVerifier: string;
-        accessToken: string;
-        refreshToken: string;
-        expiresIn: number;
-    };
-    twitterWatchList: [
-        {
-            username: string;
-            tabs: string[];
-        }
-    ];
-    tweetFrequency: {
-        dailyLimit: number;
-        currentCount: number;
-        lastTweetTime?: number;
-    };
-    stats: {
-        totalTweets: number;
-        successfulTweets: number;
-        failedTweets: number;
-    };
-    style?: {
-        all: string[];
-        chat: string[];
-        post: string[];
-    };
-    adjectives?: string[];
-    lore?: string[];
-    knowledge?: string[];
-    topics?: string[];
 }
 
 interface ApiResponse<T = any> {
@@ -177,101 +134,16 @@ class AuthUtils {
         return runtime;
     }
 
-    async verifyExistingUser(
-        runtime: any,
-        userId: string
-    ): Promise<{ config: any; profile: UserProfile }> {
-        const [configStr, profileStr] = await Promise.all([
-            runtime.databaseAdapter?.getCache({
-                agentId: userId,
-                key: "xConfig",
-            }),
-            runtime.databaseAdapter?.getCache({
-                agentId: userId,
-                key: "userProfile",
-            }),
-        ]);
-
-        if (!configStr || !profileStr) {
-            throw new ApiError(404, "User not found");
-        }
-
-        const config = JSON.parse(configStr);
-        const profile = JSON.parse(profileStr);
-
-        // Verify Twitter credentials
-        await this.verifyTwitterCredentials({
-            username: config.username,
-            email: config.email,
-            password: config.password,
-        });
-
-        return { config, profile };
-    }
-
     async validateRequest(agentId: string, userId: string) {
         if (!userId) {
             throw new ApiError(400, "Missing required field: userId");
         }
 
         const runtime = await this.getRuntime(agentId);
-        const userData = await this.verifyExistingUser(runtime, userId);
+        const userManager = new UserManager(runtime.cacheManager);
+        const userData = await userManager.verifyExistingUser(userId);
 
         return { runtime, ...userData };
-    }
-
-    async saveUserData(
-        userId: string,
-        runtime: any,
-        credentials: TwitterCredentials,
-        profile: UserProfile
-    ) {
-        const config = {
-            username: credentials.username,
-            email: credentials.email,
-            password: credentials.password,
-        };
-
-        await Promise.all([
-            runtime.databaseAdapter?.setCache({
-                agentId: userId,
-                key: "xConfig",
-                value: JSON.stringify(config),
-            }),
-            runtime.databaseAdapter?.setCache({
-                agentId: userId,
-                key: "userProfile",
-                value: JSON.stringify(profile),
-            }),
-        ]);
-    }
-
-    createDefaultProfile(username: string, email: string): UserProfile {
-        return {
-            username,
-            email,
-            level: 1,
-            experience: 0,
-            nextLevelExp: 1000,
-            points: 0,
-            tweetProfile: {
-                code: "",
-                codeVerifier: "",
-                accessToken: "",
-                refreshToken: "",
-                expiresIn: 0,
-            },
-            tweetFrequency: {
-                dailyLimit: 10,
-                currentCount: 0,
-                lastTweetTime: Date.now(),
-            },
-            stats: {
-                totalTweets: 0,
-                successfulTweets: 0,
-                failedTweets: 0,
-            },
-        };
     }
 
     async ensureUserConnection(
@@ -314,61 +186,42 @@ export class Routes {
         app.get("/:agentId/config", this.handleConfigQuery.bind(this));
         app.post("/:agentId/watch", this.handleWatchText.bind(this));
         app.post("/:agentId/chat", this.handleChat.bind(this));
-        app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
-        app.post(
-            "/:agentId/solkit_transfer",
-            this.handleSolAgentKitTransfer.bind(this)
-        );
+        //app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
+        //app.post("/:agentId/solkit_transfer",
+        //    this.handleSolAgentKitTransfer.bind(this));
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
             const {
-                username,
-                email,
-                password,
+                userId,
+                gmail,
                 roomId: customRoomId,
                 // userId: customUserId,
             } = req.body;
 
-            if (!username || !email || !password) {
+            if (!userId) {
                 throw new ApiError(400, "Missing required fields");
             }
 
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
-            const twitterProfile =
-                await this.authUtils.verifyTwitterCredentials({
-                    username,
-                    password,
-                    email,
-                });
-
-            const userId = stringToUuid(username);
             const roomId = stringToUuid(
-                customRoomId ?? `default-room-${username}-${req.params.agentId}`
+                customRoomId ?? `default-room-${userId}-${req.params.agentId}`
             );
 
             await this.authUtils.ensureUserConnection(
                 runtime,
                 userId,
                 roomId,
-                username
+                "User"
             );
 
-            const userProfile = this.authUtils.createDefaultProfile(
-                username,
-                email
-            );
-            await this.authUtils.saveUserData(
-                userId,
-                runtime,
-                { username, email, password },
-                userProfile
-            );
+            const userProfile = UserManager.createDefaultProfile(userId, gmail);
+            const userManager = new UserManager(runtime.cacheManager);
+            await userManager.saveUserData(userProfile);
 
             return {
                 profile: userProfile,
-                twitterProfile,
             };
         });
     }
@@ -379,14 +232,14 @@ export class Routes {
                 clientId: settings.TWITTER_CLIENT_ID,
                 clientSecret: settings.TWITTER_CLIENT_SECRET,
             });
-            
+
             const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
                 `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback`,
                 {
                   scope: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
                 }
             );
-            
+
             // Save state & codeVerifier
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             await runtime.cacheManager.set("oauth_verifier", JSON.stringify({
@@ -394,7 +247,7 @@ export class Routes {
                 state,
                 timestamp: Date.now()
             }), {
-                expires: Date.now() + 2* 60 * 60 * 1000,
+                expires: Date.now() + 2 * 60 * 60 * 1000,
             });
             //await runtime.databaseAdapter?.setCache({
             //    agentId: state,
@@ -406,7 +259,7 @@ export class Routes {
             //    }),
             //    ttl: 3600 // 1hour
             //});
-            
+
             return { url, state };
         });
     }
@@ -467,12 +320,14 @@ export class Routes {
 
                 // Save twitter profile
                 // TODO: encrypt token
-                const userId = req.params.agentId;
-                const userProfile = this.authUtils.createDefaultProfile(
-                    "",
-                    ""
-                );
+                //const userId = req.params.agentId;
+                const userId = stringToUuid(username);
+                const userManager = new UserManager(runtime.cacheManager);
+                const userProfile = userManager.createDefaultProfile(userId);
                 userProfile.tweetProfile = {
+                    username,
+                    email,
+                    avatar: "",
                     code,
                     codeVerifier,
                     accessToken,
@@ -484,12 +339,7 @@ export class Routes {
                 //    expires: Date.now() + 2 * 60 * 60 * 1000,
                 //});
 
-                await this.authUtils.saveUserData(
-                    userId,
-                    runtime,
-                    { username, email, password: "" },
-                    userProfile
-                );
+                await userManager.saveUserData(userProfile);
 
                 //return { accessToken };
                 res.send(`
@@ -630,7 +480,7 @@ export class Routes {
             const { profile } = req.body;
 
             // 验证必要字段
-            if (!profile || !profile.name || !profile.bio || !profile.style) {
+            if (!profile || !profile.userId || !profile.style) {
                 return res.status(400).json({
                     success: false,
                     error: "Missing required profile fields",
@@ -668,15 +518,12 @@ export class Routes {
             const { runtime, profile: existingProfile } =
                 await this.authUtils.validateRequest(
                     req.params.agentId,
-                    stringToUuid(req.body.username)
+                    req.body.userId
                 );
 
             const updatedProfile = { ...existingProfile, ...profile };
-            await runtime.databaseAdapter?.setCache({
-                agentId: stringToUuid(req.body.username),
-                key: "userProfile",
-                value: JSON.stringify(updatedProfile),
-            });
+            const userManager = new UserManager(runtime.cacheManager);
+            await userManager.updateProfile(updatedProfile);
 
             return res.json({
                 success: true,
@@ -695,7 +542,7 @@ export class Routes {
         try {
             const { profile } = await this.authUtils.validateRequest(
                 req.params.agentId,
-                stringToUuid(req.body.username)
+                req.body.userId
             );
 
             return res.json({
@@ -713,8 +560,7 @@ export class Routes {
 
     async handleCreateAgent(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const { username } = req.body;
-            const userId = stringToUuid(username);
+            const { userId } = req.body;
 
             if (!userId) {
                 throw new ApiError(400, "Missing required field: userId");
@@ -723,7 +569,6 @@ export class Routes {
             // Get user profile and credentials
             const {
                 runtime,
-                config: credentials,
                 profile,
             } = await this.authUtils.validateRequest(
                 req.params.agentId,
@@ -756,11 +601,6 @@ export class Routes {
                 bio: Array.isArray(profile.bio)
                     ? profile.bio
                     : [profile.bio || `I am ${name}`],
-                x: {
-                    username: credentials.username,
-                    email: credentials.email,
-                    password: credentials.password,
-                },
                 style: profile.style || {
                     all: [],
                     chat: [],
@@ -869,7 +709,7 @@ export class Routes {
         });
     }
 
-    async handleSolTransfer(req: express.Request, res: express.Response) {
+    /*async handleSolTransfer(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
             const {
                 fromTokenAccountPubkey,
@@ -937,5 +777,5 @@ export class Routes {
                 throw new ApiError(500, "Internal server error");
             }
         });
-    }
+    }*/
 }

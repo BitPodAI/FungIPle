@@ -1,15 +1,14 @@
-import { ICacheManager, settings } from "@ai16z/eliza";
+import { ICacheManager } from "@ai16z/eliza";
 
 interface WatchItem {
     username: string;
-    tabs: [];
+    tags: [];
 }
 
-interface UserProfile {
+export interface UserProfile {
     userId: string;
-    username: string;
-    email: string;
-    avatar?: string;
+    gmail?: string;
+    agentname: string;
     bio?: string | string[];
     walletAddress?: string;
     level: number;
@@ -17,6 +16,9 @@ interface UserProfile {
     nextLevelExp: number;
     points: number;
     tweetProfile?: {
+        username: string;
+        email: string;
+        avatar?: string;
         code: string;
         codeVerifier: string;
         accessToken: string;
@@ -47,7 +49,7 @@ interface UserProfile {
 
 interface UserManageInterface {
     // Update profile for spec user
-    updateProfile(userId: string, profile: UserProfile);
+    updateProfile(profile: UserProfile);
 
     // Update WatchList for spec user
     updateWatchList(userId: string, list: WatchItem[]): void;
@@ -56,7 +58,7 @@ interface UserManageInterface {
     getAllWatchList(): string[];
 
     // Save user profile data
-    saveUserData();
+    saveUserData(profile: UserProfile);
 }
 
 export class UserManager implements UserManageInterface {
@@ -74,8 +76,21 @@ export class UserManager implements UserManageInterface {
         await this.cacheManager.set(key, data, {expires: 0}); //expires is NEED
     }
 
-    updateProfile(userId: string, profile: UserProfile) {
-        throw new Error("Method not implemented.");
+    private async getCachedData<T>(key: string): Promise<T | null> {
+        const fileCachedData = await this.readFromCache<T>(key);
+        if (fileCachedData) {
+            return fileCachedData;
+        }
+
+        return null;
+    }
+
+    private async setCachedData<T>(cacheKey: string, data: T): Promise<void> {
+        await this.writeToCache(cacheKey, data);
+    }
+
+    async updateProfile(profile: UserProfile) {
+        await this.setCachedData(profile.userId, profile);
     }
 
     updateWatchList(userId: string, list: WatchItem[]): void {
@@ -86,8 +101,50 @@ export class UserManager implements UserManageInterface {
         throw new Error("Method not implemented.");
     }
 
-    saveUserData() {
-        throw new Error("Method not implemented.");
+    // 
+    async verifyExistingUser(
+        userId: string
+    ): Promise<{ profile: UserProfile }> {
+        return await this.getCachedData(userId);
     }
-    
+
+    async saveUserData(
+        profile: UserProfile
+    ) {
+        await this.setCachedData(profile.userId, profile);
+    }
+
+    createDefaultProfile(userId: string, gmail?: string): UserProfile {
+        return {
+            userId,
+            gmail: gmail,
+            agentname: "pod",
+            bio: "",
+            level: 1,
+            experience: 0,
+            nextLevelExp: 1000,
+            points: 0,
+            tweetProfile: {
+                username: "",
+                email: "",
+                avatar: "",
+                code: "",
+                codeVerifier: "",
+                accessToken: "",
+                refreshToken: "",
+                expiresIn: 0,
+            },
+            twitterWatchList: [],
+            tweetFrequency: {
+                dailyLimit: 10,
+                currentCount: 0,
+                lastTweetTime: Date.now(),
+            },
+            stats: {
+                totalTweets: 0,
+                successfulTweets: 0,
+                failedTweets: 0,
+            },
+        };
+    }
 }
