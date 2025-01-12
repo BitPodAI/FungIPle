@@ -453,8 +453,10 @@ export class Routes {
         res: express.Response
     ) {
         return this.authUtils.withErrorHandling(req, res, async () => {
+            const userId = req.params.userId;
             const { username, count } = req.body;
             const fetchCount = Math.min(20, count);
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
 
             try {
                 const profiles = [];
@@ -472,9 +474,11 @@ export class Routes {
 
                     const response = await scraper.searchProfiles(
                         username,
-                        count
+                        fetchCount
                     );
+                    const userManager = new UserManager(runtime.cacheManager);
                     for await (const profile of response) {
+                        profile.isWatched = userManager.isWatched(userId, profile.username);
                         profiles.push(profile);
                     }
                 } finally {
