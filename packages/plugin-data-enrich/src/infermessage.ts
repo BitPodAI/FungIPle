@@ -100,12 +100,14 @@ export class InferMessageProvider {
                         TokenAlphaReport.push(item);
                     }
 
+                    let tokenInfo = await this.enrichByWebSearch(item.token);
+
                     let alpha: WatchItem = {
                         kol: kol,
                         token: item.token,
                         title: `${item.interact}, total ${item.count} times`,
                         updatedAt: new Date().toISOString().slice(0, 16).replace(/T/g, ' '),
-                        text: `${item.token}: ${item.event}`,
+                        text: `${item.token}: ${item.event}\r\n\r\n ${tokenInfo}`,
                     };
                     kolItems.push(alpha);
                 }
@@ -118,6 +120,37 @@ export class InferMessageProvider {
         } catch (error) {
             console.error("An error occurred in addMsg:", error);
         }
+    }
+
+    async enrichByWebSearch(query: string) {
+        const apiUrl = "https://api.tavily.com/search";
+        const apiKey = settings.TAVILY_API_KEY;
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    api_key: apiKey,
+                    query,
+                    include_answer: true,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new console.error(
+                    `HTTP error! status: ${response.status}`
+                );
+            }
+
+            const data = await response.json();
+            return data.answer;
+        } catch (error) {
+            console.error("Error:", error);
+        }
+        return "";
     }
 
     static async getLatestReport(cacheManager: ICacheManager) {
