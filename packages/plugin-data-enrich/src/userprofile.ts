@@ -124,8 +124,9 @@ export class UserManager implements UserManageInterface {
     //
     async verifyExistingUser(
         userId: string
-    ): Promise<{ profile: UserProfile }> {
-        return await this.getCachedData(userId);
+    ): Promise<UserProfile> {
+        const resp = await this.getCachedData<UserProfile>(userId);
+        return resp;
     }
 
     async saveUserData(

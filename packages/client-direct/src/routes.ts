@@ -144,7 +144,7 @@ class AuthUtils {
         const userManager = new UserManager(runtime.cacheManager);
         const userData = await userManager.verifyExistingUser(userId);
 
-        return { runtime, ...userData };
+        return { runtime, profile: userData };
     }
 
     async ensureUserConnection(
@@ -654,7 +654,7 @@ export class Routes {
             );
 
             const {
-                name = profile.username,
+                name = profile.agentname,
                 roomId: customRoomId,
                 prompt,
             } = req.body;
@@ -665,15 +665,14 @@ export class Routes {
 
             const roomId = stringToUuid(
                 customRoomId ??
-                    `default-room-${profile.username}-${req.params.agentId}`
+                    `default-room-${profile.userId}-${req.params.agentId}`
             );
-            const newAgentId = stringToUuid(name);
+            const newAgentId = stringToUuid(userId);
 
             // Create agent config from user credentials
             const agentConfig: AgentConfig = {
                 ...profile,
                 prompt,
-                name,
                 clients: ["twitter"],
                 modelProvider: "redpill",
                 bio: Array.isArray(profile.bio)
@@ -694,7 +693,7 @@ export class Routes {
             await runtime.ensureConnection(
                 userId,
                 roomId,
-                profile.username,
+                profile.userId,
                 name,
                 "direct"
             );
