@@ -55,13 +55,16 @@ interface UserManageInterface {
     updateWatchList(userId: string, list: WatchItem[]): void;
 
     // Get the watchlist for all users, and identified.
-    getAllWatchList(): string[];
+    getAllWatchList(): Promise<string[]>;
 
     // Save user profile data
     saveUserData(profile: UserProfile);
 }
 
 export class UserManager implements UserManageInterface {
+    static ALL_USER_IDS: string = "USER_PROFILE_ALL_IDS_";
+    idSet = new Set();
+
     constructor(
         private cacheManager: ICacheManager
     ) {
@@ -97,8 +100,18 @@ export class UserManager implements UserManageInterface {
         throw new Error("Method not implemented.");
     }
 
-    getAllWatchList(): string[] {
-        throw new Error("Method not implemented.");
+    async getAllWatchList(): Promise<string[]> {
+        let watchList = new Set<string>();
+        // Get All ids
+        for (const userid of this.idSet.keys()) {
+            let userProfile = await this.getCachedData<UserProfile>(userid as string);
+            if (userProfile) {
+                for (const watchItem of userProfile.twitterWatchList) {
+                    watchList.add(watchItem.username);
+                }
+            }
+        }
+        return Array.from(watchList);
     }
 
     // 
@@ -112,6 +125,11 @@ export class UserManager implements UserManageInterface {
         profile: UserProfile
     ) {
         await this.setCachedData(profile.userId, profile);
+        let idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
+        let ids = new Set(JSON.parse(idsStr));
+        ids.add(profile.userId);
+        await this.setCachedData(UserManager.ALL_USER_IDS, JSON.stringify(Array.from(ids)));
+        this.idSet = ids;
     }
 
     createDefaultProfile(userId: string, gmail?: string): UserProfile {

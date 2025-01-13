@@ -230,8 +230,8 @@ export class Routes {
                 "User"
             );
 
-            const userProfile = UserManager.createDefaultProfile(userId, gmail);
             const userManager = new UserManager(runtime.cacheManager);
+            const userProfile = userManager.createDefaultProfile(userId, gmail);
             await userManager.saveUserData(userProfile);
 
             return {
@@ -700,12 +700,21 @@ export class Routes {
         return this.authUtils.withErrorHandling(req, res, async () => {
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             try {
-                const { cursor } = req.body;
-                const report =
-                    await InferMessageProvider.getAllWatchItemsPaginated(
+                const { cursor, watchlist } = req.body;
+                let report;
+                if (watchlist) {
+                    report = await InferMessageProvider.getWatchItemsPaginatedForKols(
+                        runtime.cacheManager,
+                        watchlist,
+                        cursor
+                    );
+                }
+                else {
+                    report = await InferMessageProvider.getAllWatchItemsPaginated(
                         runtime.cacheManager,
                         cursor
                     );
+                }
                 return { watchlist: report };
             } catch (error) {
                 console.error("Error fetching token data:", error);

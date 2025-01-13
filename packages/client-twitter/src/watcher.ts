@@ -1,5 +1,6 @@
 import {
     TW_KOL_1,
+    UserManager,
     ConsensusProvider,
     InferMessageProvider,
 } from "@ai16z/plugin-data-enrich";
@@ -11,7 +12,9 @@ import {
 } from "@ai16z/eliza";
 import { ClientBase } from "./base";
 import { TwitterApi } from 'twitter-api-v2';
+import { EventEmitter } from "events";
 
+export const twEventCenter = new EventEmitter();
 
 const WATCHER_INSTRUCTION = `
 Please find the following data according to the text provided in the following format:
@@ -89,6 +92,13 @@ export class TwitterWatchClient {
         }
         this.consensus.startNode();
 
+        /*twEventCenter.on('MSG_SEARCH_TWITTER_PROFILE', async (data) => {
+            console.log('Received message:', data);
+            const profiles = await this.searchProfile(data.username, data.count);
+            // Send back
+            twEventCenter.emit('MSG_SEARCH_TWITTER_PROFILE_RESP', profiles);
+        });*/
+
         const genReportLoop = async () => {
             console.log("TwitterWatcher loop");
             const lastGen = await this.runtime.cacheManager.get<{
@@ -115,9 +125,28 @@ export class TwitterWatchClient {
         genReportLoop();
     }
 
-    getKolList() {
+    async getKolList() {
         // TODO: Should be a unipool shared by all users.
-        return JSON.parse(settings.TW_KOL_LIST) || TW_KOL_1;
+        //return JSON.parse(settings.TW_KOL_LIST) || TW_KOL_1;
+        const userManager = new UserManager(this.runtime.cacheManager);
+        return await userManager.getAllWatchList();
+    }
+
+    async searchProfile(username: string, count: number) {
+        let profiles = [];
+
+        try {
+            const response = await this.client.twitterClient.searchProfiles(username, count);
+            if (response ) {
+                for await (const profile of response) {
+                    console.log(profile);
+                    profiles.push(profile);
+                }
+            }
+        } catch (error) {
+            console.error("searchProfile error:", error);
+        }
+        return profiles;
     }
 
     async fetchTokens() {
@@ -127,7 +156,7 @@ export class TwitterWatchClient {
             const currentTime = new Date();
             const timeline =
                 Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
-            const kolList = this.getKolList();
+            const kolList = await this.getKolList();
             for (const kol of kolList) {
                 let kolTweets = [];
                 let tweets =
