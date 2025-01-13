@@ -1,7 +1,7 @@
 import express from "express";
 import { DirectClient } from "./index";
 import { Scraper } from "agent-twitter-client";
-import { generateText, ModelClass, stringToUuid } from "@ai16z/eliza";
+import { elizaLogger, generateText, ModelClass, stringToUuid } from "@ai16z/eliza";
 import { Memory, settings } from "@ai16z/eliza";
 import { AgentConfig } from "../../../agent/src";
 import {
@@ -178,6 +178,7 @@ export class Routes {
 
     setupRoutes(app: express.Application): void {
         app.post("/:agentId/login", this.handleLogin.bind(this));
+        app.post("/:agentId/guest_login", this.handleGuestLogin.bind(this));
         app.get(
             "/:agentId/twitter_oauth_init",
             this.handleTwitterOauthInit.bind(this)
@@ -232,6 +233,48 @@ export class Routes {
 
             const userManager = new UserManager(runtime.cacheManager);
             const userProfile = userManager.createDefaultProfile(userId, gmail);
+            await userManager.saveUserData(userProfile);
+
+            return {
+                profile: userProfile,
+            };
+        });
+    }
+
+
+    async handleGuestLogin(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            var userId = null;
+            const {
+                username,
+                email,
+                password,
+                roomId: customRoomId,
+                // userId: customUserId,
+            } = req.body;
+
+            if (username && username.toString().startsWith("Guest-")) {
+                userId = stringToUuid(username);
+            }
+
+            if (!userId) {
+                throw new ApiError(400, "Missing required fields");
+            }
+
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const roomId = stringToUuid(
+                customRoomId ?? `default-room-${userId}-${req.params.agentId}`
+            );
+
+            await this.authUtils.ensureUserConnection(
+                runtime,
+                userId,
+                roomId,
+                "User"
+            );
+
+            const userManager = new UserManager(runtime.cacheManager);
+            const userProfile = userManager.createDefaultProfile(userId, email);
             await userManager.saveUserData(userProfile);
 
             return {
@@ -556,7 +599,7 @@ export class Routes {
             const { runtime, profile: existingProfile } =
                 await this.authUtils.validateRequest(
                     req.params.agentId,
-                    req.body.userId
+                    profile.userId
                 );
 
             const updatedProfile = { ...existingProfile, ...profile };
