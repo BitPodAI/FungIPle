@@ -5,6 +5,7 @@ import {
     InferMessageProvider,
 } from "@ai16z/plugin-data-enrich";
 import {
+    elizaLogger,
     generateText,
     IAgentRuntime,
     ModelClass,
@@ -69,6 +70,7 @@ ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 const TWEET_COUNT_PER_TIME = 20;      //count related to timeline
 const TWEET_TIMELINE = 60 * 60 * 8;   //timeline related to count
 const GEN_TOKEN_REPORT_DELAY = 1000 * TWEET_TIMELINE;
+const SEND_TWITTER_INTERNAL = 1000 * 60 * 60;
 
 export class TwitterWatchClient {
     client: ClientBase;
@@ -85,6 +87,98 @@ export class TwitterWatchClient {
         );
     }
 
+    convertTimeToMilliseconds(timeStr: string): number {
+        switch (timeStr) {
+            case '1h':
+                return 1 * 60 * 60 * 1000; // 1 hour in milliseconds
+            case '2h':
+                return 2 * 60 * 60 * 1000; // 2 hour in milliseconds
+            case '3h':
+                return 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+            case '12h':
+                return 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+            case '24h':
+                return 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            default:
+                return 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        }
+    }
+    generatePrompt(imitate: string, text: string): string {
+        let prompt = "Here is your personality introduction and Twitter style, and Please imitate the style of the characters below and modify the Twitter content afterwards.Twitter content is after the keyword [Twitter]:";
+        switch (imitate) {
+            case 'elonmusk':
+                prompt += "Elon Musk is known for his highly innovative and adventurous spirit, with a strong curiosity and drive for pushing boundaries.Elon’s tweets are direct and full of personality. He often posts short, humorous, and at times provocative content.";
+                break;
+
+            case 'cz_binance':
+                prompt += "CZ is a pragmatic and calm entrepreneur, skilled in handling complex market issues.CZ's tweets are usually concise and informative, focusing on cryptocurrency news, Binance updates, and industry trends.";
+                break;
+
+            case 'aeyakovenko':
+                prompt += "the founder of Solana, is seen as a highly focused individual who pays close attention to technical details.Yakovenko’s tweets are more technical, often discussing the future development of blockchain technologies, Solana's progress, and major industry challenges. ";
+                break;
+
+            case 'jessepollak':
+                prompt += "Jesse Pollak is someone with a strong passion for technology and community. He is an active figure in the cryptocurrency community, especially in areas like technical development and user experience, and he has an innovative mindset.Jesse’s tweets are typically concise and easy to understand, showcasing his personal style.";
+                break;
+
+            case 'shawmakesmagic':
+                prompt += "Shawn is a creative individual who enjoys exploring innovative projects and cutting-edge technologies.His tweets are generally creative, often sharing innovative applications of blockchain technology or topics related to magic, fantasy, and imagination.";
+                break;
+
+            case 'everythingempt':
+                prompt += "Everythingempt is Openness,Conscientiousness,Extraversion,Agreeableness. Twitter's style is Minimalist,Customized Experience,Selective Content";
+                break;
+
+                default:
+                    break;
+        }
+        prompt += "\n[Twitter]:";
+        prompt += text;
+        return prompt;
+    }
+    async runTask() {
+        elizaLogger.log("Twitter Sender task loop");
+        const userManager = new UserManager(this.runtime.cacheManager);
+        const userProfiles = await userManager.getAllUserProfiles();
+        for (let i = 0; i < userProfiles.length; i++) {
+            let userProfile = userProfiles[i];
+            if(!userProfile.agentCfg || !userProfile.agentCfg.interval
+                ||!userProfile.agentCfg.imitate) {
+                    continue;
+            }
+            const {enabled, interval, imitate} = userProfile.agentCfg;
+            if(!enabled) {
+                continue;
+            }
+            const lastTweetTime = userProfile.tweetFrequency.lastTweetTime;
+            if(Date.now() - lastTweetTime > this.convertTimeToMilliseconds(interval)) {
+                userProfile.tweetFrequency.lastTweetTime = Date.now();
+                userManager.saveUserData(userProfile);
+                try {
+                    let tweet = await InferMessageProvider.getAllWatchItemsPaginated(this.runtime.cacheManager);
+                    if (tweet) {
+                        const prompt = this.generatePrompt(imitate, JSON.stringify(tweet?.items[0]));
+                        let response = await generateText({
+                            runtime: this.runtime,
+                            context: prompt,
+                            modelClass: ModelClass.LARGE,
+                        });
+                    elizaLogger.log("Twitter Sender msg:" + tweet);
+                    await this.sendTweet(response, userProfile);
+                    } else {
+                    elizaLogger.log("Twitter Sender msg is null, skip this time");
+                    }
+                } catch (error: any) {
+                    elizaLogger.error("Twitter send err: ", error.message);
+                }
+
+            }
+        }
+
+    }
+    intervalId: NodeJS.Timeout;
+
     async start() {
         console.log("TwitterWatcher start");
         if (!this.client.profile) {
@@ -98,9 +192,10 @@ export class TwitterWatchClient {
             // Send back
             twEventCenter.emit('MSG_SEARCH_TWITTER_PROFILE_RESP', profiles);
         });*/
-
+        this.intervalId = setInterval(() => this.runTask(), SEND_TWITTER_INTERNAL);
+        // this.intervalId = setInterval(() => this.runTask(), 10000);
         const genReportLoop = async () => {
-            console.log("TwitterWatcher loop");
+            elizaLogger.log("TwitterWatcher loop");
             const lastGen = await this.runtime.cacheManager.get<{
                 timestamp: number;
             }>(
@@ -117,6 +212,7 @@ export class TwitterWatchClient {
             setTimeout(() => {
                 genReportLoop(); // Set up next iteration
             }, GEN_TOKEN_REPORT_DELAY);
+            //}, 60000);
 
             console.log(
                 `Next tweet scheduled in ${GEN_TOKEN_REPORT_DELAY / 60 / 1000} minutes`
@@ -220,24 +316,30 @@ export class TwitterWatchClient {
             );
             await this.consensus.pubMessage(report);
 
-            // Post Tweet of myself
-            //let tweet = await this.inferMsgProvider.getAlphaText();
-            let tweet = await InferMessageProvider.getAllWatchItemsPaginated(this.runtime.cacheManager);
-            console.log(tweet);
-            await this.sendTweet(JSON.stringify(tweet?.items[0]));
+            // try {
+            //     let tweet = await InferMessageProvider.getAllWatchItemsPaginated(this.runtime.cacheManager);
+            //     if (tweet) {
+            //     elizaLogger.log("Twitter Sender2 msg:" + tweet);
+            //     await this.sendTweet(JSON.stringify(tweet?.items[0]));
+            //     } else {
+            //     elizaLogger.log("Twitter Sender2 msg is null, skip this time");
+            //     }
+            // } catch (error: any) {
+            //     elizaLogger.error("Twitter Sender2 err: ", error.message);
+            // }
         } catch (error) {
             console.error("An error occurred:", error);
         }
         return fetchedTokens;
     }
 
-    async sendTweet(tweet: string) {
+    async sendTweet(tweet: string, cached: any) {
         try {
             // Parse the tweet object
             //const tweetData = JSON.parse(tweet || `{}`);
             const tweetData = JSON.parse(tweet || `{}`);
 
-            const cached = await this.runtime.cacheManager.get("userProfile");
+            //const cached = await this.runtime.cacheManager.get("userProfile");
             if (cached) {
                 // Login with v2
                 const profile = JSON.parse(cached);

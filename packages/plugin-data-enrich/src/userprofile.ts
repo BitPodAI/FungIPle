@@ -25,6 +25,11 @@ export interface UserProfile {
         refreshToken: string;
         expiresIn: number;
     };
+    agentCfg?: {
+        enabled: boolean;
+        interval: string;
+        imitate: string;
+    };
     twitterWatchList: WatchItem[];
     tweetFrequency: {
         dailyLimit: number;
@@ -59,6 +64,8 @@ interface UserManageInterface {
 
     // Save user profile data
     saveUserData(profile: UserProfile);
+
+    getAllUserProfiles(): Promise<UserProfile[]>;
 }
 
 export class UserManager implements UserManageInterface {
@@ -114,7 +121,7 @@ export class UserManager implements UserManageInterface {
         return Array.from(watchList);
     }
 
-    // 
+    //
     async verifyExistingUser(
         userId: string
     ): Promise<{ profile: UserProfile }> {
@@ -130,6 +137,28 @@ export class UserManager implements UserManageInterface {
         ids.add(profile.userId);
         await this.setCachedData(UserManager.ALL_USER_IDS, JSON.stringify(Array.from(ids)));
         this.idSet = ids;
+    }
+
+    // Add this new method to the class
+    async getAllUserProfiles(): Promise<UserProfile[]> {
+    // Get all user IDs
+    const idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
+    if (!idsStr) {
+        return [];
+    }
+
+    // Parse IDs array
+    const ids = JSON.parse(idsStr);
+
+    // Fetch all profiles using Promise.all for parallel execution
+    const profiles = await Promise.all(
+        ids.map(async (userId: string) => {
+            return await this.getCachedData(userId) as UserProfile;
+        })
+    );
+
+        // Filter out any null/undefined profiles
+       return profiles.filter(profile => profile != null);
     }
 
     createDefaultProfile(userId: string, gmail?: string): UserProfile {
@@ -152,6 +181,7 @@ export class UserManager implements UserManageInterface {
                 refreshToken: "",
                 expiresIn: 0,
             },
+            agentCfg :  {enabled: true, interval: "24h", imitate: "elonmusk"},
             twitterWatchList: [],
             tweetFrequency: {
                 dailyLimit: 10,
