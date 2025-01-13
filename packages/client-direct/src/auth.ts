@@ -1,11 +1,14 @@
 import { PrivyClient } from "@privy-io/server-auth";
 import { RequestHandler } from "express";
+import { settings } from "@ai16z/eliza";
+
 const privy = new PrivyClient(
-    process.env.PRIVY_APP_ID,
-    process.env.PRIVY_APP_SECRET
+    settings.PRIVY_APP_ID,
+    settings.PRIVY_APP_SECRET
 );
+
 /**
- * 验证 privy token
+ * Verify privy token
  * @param token
  * @returns
  */

@@ -478,7 +478,7 @@ export class Routes {
                     );
                     const userManager = new UserManager(runtime.cacheManager);
                     for await (const profile of response) {
-                        profile.isWatched = userManager.isWatched(userId, profile.username);
+                        profile.isWatched = await userManager.isWatched(userId, profile.username);
                         profiles.push(profile);
                     }
                 } finally {

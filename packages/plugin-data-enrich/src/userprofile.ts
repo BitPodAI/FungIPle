@@ -149,8 +149,12 @@ export class UserManager implements UserManageInterface {
     }
 
     // Check whether the profile is watched
-    async isWatched(userId: string, twUsername: string) {
+    async isWatched(userId: string, twUsername: string): Promise<boolean> {
         const profile = await this.getCachedData<UserProfile>(userId);
-        return profile.twitterWatchList.some(item => item.username === twUsername);
+        if (profile) {
+            return profile.twitterWatchList.some(item => item.username === twUsername);
+        } else {
+            return false;
+        }
     }
 }
