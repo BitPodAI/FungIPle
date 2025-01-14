@@ -2,6 +2,8 @@ import { ICacheManager } from "@ai16z/eliza";
 
 interface WatchItem {
     username: string;
+    avatar: string;
+    name: string;
     tags: [];
 }
 
@@ -107,17 +109,35 @@ export class UserManager implements UserManageInterface {
         throw new Error("Method not implemented.");
     }
 
+    async getWatchList(userId: string): Promise<string[]> {
+        let watchList = new Set<string>();
+        // Get list by userId
+        let userProfile = await this.getCachedData<UserProfile>(userId as string);
+        if (userProfile) {
+            for (const watchItem of userProfile.twitterWatchList) {
+                watchList.add(watchItem.username);
+            }
+        }
+        return Array.from(watchList);
+    }
+
+
     async getAllWatchList(): Promise<string[]> {
         let watchList = new Set<string>();
         // Get All ids
-        for (const userid of this.idSet.keys()) {
+        let idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
+        let ids = new Set(JSON.parse(idsStr));
+        for (const userid of ids.keys()) {
             let userProfile = await this.getCachedData<UserProfile>(userid as string);
             if (userProfile) {
-                for (const watchItem of userProfile.twitterWatchList) {
-                    watchList.add(watchItem.username);
+                if (userProfile.twitterWatchList) {
+                    for (const watchItem of userProfile.twitterWatchList) {
+                        watchList.add(watchItem.username);
+                    }
                 }
             }
         }
+        console.log(watchList);
         return Array.from(watchList);
     }
 

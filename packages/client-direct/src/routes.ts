@@ -20,7 +20,7 @@ import { InvalidPublicKeyError } from "./solana";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTokenTransferTransaction } from "./solana";
-import { requireAuth } from "./auth";
+//import { requireAuth } from "./auth";
 
 interface TwitterCredentials {
     username: string;
@@ -194,7 +194,7 @@ export class Routes {
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post(
             "/:agentId/profile",
-            requireAuth,
+            //requireAuth,
             this.handleProfileQuery.bind(this)
         );
         app.post("/:agentId/create_agent", this.handleCreateAgent.bind(this));
@@ -496,10 +496,10 @@ export class Routes {
         res: express.Response
     ) {
         return this.authUtils.withErrorHandling(req, res, async () => {
-            const userId = req.params.userId;
-            const { username, count } = req.body;
+            const { username, count, userId } = req.body;
             const fetchCount = Math.min(20, count);
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            console.log(userId);
 
             try {
                 const profiles = [];
@@ -520,6 +520,18 @@ export class Routes {
                         fetchCount
                     );
                     const userManager = new UserManager(runtime.cacheManager);
+                    const alreadyWatchedList = await userManager.getWatchList(userId);
+                    for (const item of alreadyWatchedList) {
+                        let profile = {
+                            isWatched: true,
+                            username: item,
+                            name: item,
+                            avatar: "https://pbs.twimg.com/profile_images/898967039301349377/bLmMDwtf.jpg",
+                            //avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile.png",
+                            //avatar: "https://pbs.twimg.com/profile_images/1809130917350494209/Q_WjcqLz.jpg";
+                        }
+                        profiles.push(profile);
+                    }
                     for await (const profile of response) {
                         profile.isWatched = await userManager.isWatched(userId, profile.username);
                         profiles.push(profile);

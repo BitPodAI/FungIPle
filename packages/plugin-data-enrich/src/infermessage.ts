@@ -127,6 +127,17 @@ export class InferMessageProvider {
         const apiKey = settings.TAVILY_API_KEY;
 
         try {
+            const prompt = [{
+                "role": "system",
+                "content":  `You are an Web3 & AI critical thinker research assistant. 
+                            Your sole purpose is to write well written, critically acclaimed,
+                            objective and structured reports on given text.`
+            }, {
+                "role": "user",
+                "content": `
+                           'Using the above information, answer the following
+                           query: "${query}" in a detailed report'`
+            }]
             const response = await fetch(apiUrl, {
                 method: "POST",
                 headers: {
@@ -134,7 +145,7 @@ export class InferMessageProvider {
                 },
                 body: JSON.stringify({
                     api_key: apiKey,
-                    query,
+                    prompt,
                     include_answer: true,
                 }),
             });
