@@ -502,7 +502,7 @@ export class Routes {
             console.log(userId);
 
             try {
-                const profiles = [];
+                const profilesForDB = [];
                 const scraper = new Scraper();
                 try {
                     await scraper.login(
@@ -515,29 +515,36 @@ export class Routes {
                         throw new ApiError(401, "Twitter process failed");
                     }
 
-                    const response = await scraper.searchProfiles(
+                    const profilesForScraper = await scraper.searchProfiles(
                         username,
                         fetchCount
                     );
                     const userManager = new UserManager(runtime.cacheManager);
                     const alreadyWatchedList = await userManager.getWatchList(userId);
+                    const usernameSet = new Set<string>();
                     if (alreadyWatchedList) {
                         for (const item of alreadyWatchedList) {
                             let profile = {
                                 isWatched: true,
-                                username: item,
-                                name: item,
-                                avatar: "https://pbs.twimg.com/profile_images/898967039301349377/bLmMDwtf.jpg",
+                                username: item?.username,
+                                name: item?.name,
+                                avatar: item?.avatar,
+                                //avatar: "https://pbs.twimg.com/profile_images/898967039301349377/bLmMDwtf.jpg",
                                 //avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile.png",
                                 //avatar: "https://pbs.twimg.com/profile_images/1809130917350494209/Q_WjcqLz.jpg";
                             }
-                            profiles.push(profile);
+
+                            if (item?.username) {
+                                usernameSet.add(item.username);
+                            }
+                            profilesForDB.push(profile);
                         }
                     }
-                    for await (const profile of response) {
+                    for await (const profile of profilesForScraper) {
                         console.log(profile);
-                        profile.isWatched = await userManager.isWatched(userId, profile.username);
-                        profiles.push(profile);
+                        if (!usernameSet.has(profile.username)) {
+                            profilesForDB.push(profile);
+                        }
                     }
                 } finally {
                     await scraper.logout();
@@ -560,7 +567,7 @@ export class Routes {
                 // wait for result
                 const result = await promise;
                 return { profiles: result };*/
-                return profiles;
+                return profilesForDB;
             } catch (error) {
                 console.error("Profile search error:", error);
                 return res.status(500).json({

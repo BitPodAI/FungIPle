@@ -110,16 +110,16 @@ export class UserManager implements UserManageInterface {
         throw new Error("Method not implemented.");
     }
 
-    async getWatchList(userId: string): Promise<string[]> {
-        let watchList = new Set<string>();
-        // Get list by userId
+    async getWatchList(userId: string): Promise<WatchItem[]> {
+        // let watchList = new Set<string>();
+        // // Get list by userId
         let userProfile = await this.getCachedData<UserProfile>(userId as string);
-        if (userProfile?.twitterWatchList) {
-            for (const watchItem of userProfile.twitterWatchList) {
-                watchList.add(watchItem.username);
-            }
-        }
-        return Array.from(watchList);
+        // if (userProfile?.twitterWatchList) {
+        //     for (const watchItem of userProfile.twitterWatchList) {
+        //         watchList.add(watchItem.username);
+        //     }
+        // }
+        return Array.from(userProfile?.twitterWatchList);
     }
 
 

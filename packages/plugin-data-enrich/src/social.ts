@@ -8,7 +8,7 @@ export const TW_KOL_1 = [
     "aeyakovenko",
     "jessepollak",
     "shawmakesmagic",
-    "everythingempt0",
+    "everythingempt",
 ];
 
 export const TW_KOL_2 = [
