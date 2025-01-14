@@ -541,8 +541,8 @@ export class Routes {
                         }
                     }
                     for await (const profile of profilesForScraper) {
-                        console.log(profile);
-                        if (!usernameSet.has(profile.username)) {
+                        profile.isWatched = await userManager.isWatched(userId, profile.username);
+                        if (!profile.isWatched) {
                             profilesForDB.push(profile);
                         }
                     }
