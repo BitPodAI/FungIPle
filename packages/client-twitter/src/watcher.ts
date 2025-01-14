@@ -68,7 +68,7 @@ ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
 const TWEET_COUNT_PER_TIME = 20;      //count related to timeline
-const TWEET_TIMELINE = 60 * 60 * 8;   //timeline related to count
+const TWEET_TIMELINE = 60 * 60 * 2;   //timeline related to count
 const GEN_TOKEN_REPORT_DELAY = 1000 * TWEET_TIMELINE;
 const SEND_TWITTER_INTERNAL = 1000 * 60 * 60;
 
@@ -235,7 +235,6 @@ export class TwitterWatchClient {
             const response = await this.client.twitterClient.searchProfiles(username, count);
             if (response ) {
                 for await (const profile of response) {
-                    console.log(profile);
                     profiles.push(profile);
                 }
             }
@@ -251,7 +250,7 @@ export class TwitterWatchClient {
         try {
             const currentTime = new Date();
             const timeline =
-                Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
+                Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE - 60 * 60 * 24;
             const kolList = await this.getKolList();
             for (const kol of kolList) {
                 let kolTweets = [];

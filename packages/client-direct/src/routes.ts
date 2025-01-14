@@ -521,18 +521,21 @@ export class Routes {
                     );
                     const userManager = new UserManager(runtime.cacheManager);
                     const alreadyWatchedList = await userManager.getWatchList(userId);
-                    for (const item of alreadyWatchedList) {
-                        let profile = {
-                            isWatched: true,
-                            username: item,
-                            name: item,
-                            avatar: "https://pbs.twimg.com/profile_images/898967039301349377/bLmMDwtf.jpg",
-                            //avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile.png",
-                            //avatar: "https://pbs.twimg.com/profile_images/1809130917350494209/Q_WjcqLz.jpg";
+                    if (alreadyWatchedList) {
+                        for (const item of alreadyWatchedList) {
+                            let profile = {
+                                isWatched: true,
+                                username: item,
+                                name: item,
+                                avatar: "https://pbs.twimg.com/profile_images/898967039301349377/bLmMDwtf.jpg",
+                                //avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile.png",
+                                //avatar: "https://pbs.twimg.com/profile_images/1809130917350494209/Q_WjcqLz.jpg";
+                            }
+                            profiles.push(profile);
                         }
-                        profiles.push(profile);
                     }
                     for await (const profile of response) {
+                        console.log(profile);
                         profile.isWatched = await userManager.isWatched(userId, profile.username);
                         profiles.push(profile);
                     }
@@ -572,16 +575,16 @@ export class Routes {
         try {
             const { profile } = req.body;
 
-            // 验证必要字段
-            if (!profile || !profile.userId || !profile.style) {
+            // Required field
+            if (!profile || !profile.userId) {
                 return res.status(400).json({
                     success: false,
                     error: "Missing required profile fields",
                 });
             }
 
-            // 验证数组字段
-            if (
+            // Array
+            /*if (
                 !Array.isArray(profile.bio) ||
                 !Array.isArray(profile.topics) ||
                 !Array.isArray(profile.messageExamples)
@@ -592,7 +595,7 @@ export class Routes {
                 });
             }
 
-            // 验证嵌套对象
+            // Objects
             if (
                 !profile.style.all ||
                 !profile.style.chat ||
@@ -605,9 +608,9 @@ export class Routes {
                     success: false,
                     error: "Invalid style configuration",
                 });
-            }
+            }*/
 
-            // 更新profile
+            // update profile
             const { runtime, profile: existingProfile } =
                 await this.authUtils.validateRequest(
                     req.params.agentId,

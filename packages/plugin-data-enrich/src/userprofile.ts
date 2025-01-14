@@ -1,4 +1,5 @@
 import { ICacheManager } from "@ai16z/eliza";
+import { TW_KOL_1 } from "./social";
 
 interface WatchItem {
     username: string;
@@ -113,7 +114,7 @@ export class UserManager implements UserManageInterface {
         let watchList = new Set<string>();
         // Get list by userId
         let userProfile = await this.getCachedData<UserProfile>(userId as string);
-        if (userProfile) {
+        if (userProfile?.twitterWatchList) {
             for (const watchItem of userProfile.twitterWatchList) {
                 watchList.add(watchItem.username);
             }
@@ -124,16 +125,17 @@ export class UserManager implements UserManageInterface {
 
     async getAllWatchList(): Promise<string[]> {
         let watchList = new Set<string>();
+        for (const kol of TW_KOL_1) {
+            watchList.add(kol);
+        }
         // Get All ids
         let idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
         let ids = new Set(JSON.parse(idsStr));
         for (const userid of ids.keys()) {
             let userProfile = await this.getCachedData<UserProfile>(userid as string);
-            if (userProfile) {
-                if (userProfile.twitterWatchList) {
-                    for (const watchItem of userProfile.twitterWatchList) {
-                        watchList.add(watchItem.username);
-                    }
+            if (userProfile && userProfile.twitterWatchList) {
+                for (const watchItem of userProfile.twitterWatchList) {
+                    watchList.add(watchItem.username);
                 }
             }
         }
@@ -220,7 +222,7 @@ export class UserManager implements UserManageInterface {
     // Check whether the profile is watched
     async isWatched(userId: string, twUsername: string): Promise<boolean> {
         const profile = await this.getCachedData<UserProfile>(userId);
-        if (profile) {
+        if (profile && profile.twitterWatchList) {
             return profile.twitterWatchList.some(item => item.username === twUsername);
         } else {
             return false;
