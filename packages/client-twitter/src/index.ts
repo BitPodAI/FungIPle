@@ -41,11 +41,9 @@ export const TwitterClientInterface: Client = {
 
         //await manager.interaction.start();
         await manager.watcher.start();
-
-        twEventCenter.on('MSG_RE_TWITTER', async (data) => {
-            const { text, userId } = data;
+        twEventCenter.on('MSG_RE_TWITTER', (text, userId) => {
             console.log('MSG_RE_TWITTER userId: ' + userId + " text: " + text);
-            await manager.watcher.sendReTweet(text, userId);
+            manager.watcher.sendReTweet(text, userId);
         });
         return manager;
     },

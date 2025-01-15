@@ -95,6 +95,11 @@ export class DirectClient {
         const routes = new Routes(this, this.registerCallbackFn);
         routes.setupRoutes(this.app);
 
+        // This is an interface for debugging whether the network is connected or not
+        this.app.get('/hello', (req, res) => {
+            res.json('Hello, Web3 World!');
+          });
+
         // Define an interface that extends the Express Request interface
         interface CustomRequest extends ExpressRequest {
             file: File;
