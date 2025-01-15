@@ -153,7 +153,7 @@ export class TwitterWatchClient {
             const lastTweetTime = userProfile.tweetFrequency.lastTweetTime;
             if(Date.now() - lastTweetTime > this.convertTimeToMilliseconds(interval)) {
                 userProfile.tweetFrequency.lastTweetTime = Date.now();
-                userManager.saveUserData(userProfile);
+                this.userManager.saveUserData(userProfile);
                 try {
                     let tweet = await InferMessageProvider.getAllWatchItemsPaginated(this.runtime.cacheManager);
                     if (tweet) {

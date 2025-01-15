@@ -68,6 +68,7 @@ interface UserManageInterface {
     // Save user profile data
     saveUserData(profile: UserProfile);
 
+    getUserProfile(userId: string): Promise<UserProfile>;
     getAllUserProfiles(): Promise<UserProfile[]>;
 }
 
@@ -162,26 +163,35 @@ export class UserManager implements UserManageInterface {
         this.idSet = ids;
     }
 
-    // Add this new method to the class
-    async getAllUserProfiles(): Promise<UserProfile[]> {
-    // Get all user IDs
-    const idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
-    if (!idsStr) {
-        return [];
+    // Get the user profile by userId
+    async getUserProfile(userId: string): Promise<UserProfile> {
+        if (!userId) {
+            return null;
+        }
+
+        return await this.getCachedData(userId) as UserProfile;
     }
 
-    // Parse IDs array
-    const ids = JSON.parse(idsStr);
+    // Add this new method to the class
+    async getAllUserProfiles(): Promise<UserProfile[]> {
+        // Get all user IDs
+        const idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
+        if (!idsStr) {
+            return [];
+        }
 
-    // Fetch all profiles using Promise.all for parallel execution
-    const profiles = await Promise.all(
-        ids.map(async (userId: string) => {
-            return await this.getCachedData(userId) as UserProfile;
-        })
-    );
+        // Parse IDs array
+        const ids = JSON.parse(idsStr);
+
+        // Fetch all profiles using Promise.all for parallel execution
+        const profiles = await Promise.all(
+            ids.map(async (userId: string) => {
+                return await this.getCachedData(userId) as UserProfile;
+            })
+        );
 
         // Filter out any null/undefined profiles
-       return profiles.filter(profile => profile != null);
+        return profiles.filter(profile => profile != null);
     }
 
     createDefaultProfile(userId: string, gmail?: string): UserProfile {
