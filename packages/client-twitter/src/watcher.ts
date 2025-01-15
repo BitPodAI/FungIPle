@@ -13,9 +13,6 @@ import {
 } from "@ai16z/eliza";
 import { ClientBase } from "./base";
 import { TwitterApi } from 'twitter-api-v2';
-import { EventEmitter } from "events";
-
-export const twEventCenter = new EventEmitter();
 
 const WATCHER_INSTRUCTION = `
 Please find the following data according to the text provided in the following format:
@@ -77,6 +74,7 @@ export class TwitterWatchClient {
     runtime: IAgentRuntime;
     consensus: ConsensusProvider;
     inferMsgProvider: InferMessageProvider;
+    userManager: UserManager;
 
     constructor(client: ClientBase, runtime: IAgentRuntime) {
         this.client = client;
@@ -85,6 +83,7 @@ export class TwitterWatchClient {
         this.inferMsgProvider = new InferMessageProvider(
             this.runtime.cacheManager
         );
+        this.userManager = new UserManager(this.runtime.cacheManager);
     }
 
     convertTimeToMilliseconds(timeStr: string): number {
@@ -139,8 +138,8 @@ export class TwitterWatchClient {
     }
     async runTask() {
         elizaLogger.log("Twitter Sender task loop");
-        const userManager = new UserManager(this.runtime.cacheManager);
-        const userProfiles = await userManager.getAllUserProfiles();
+        // const userManager = new UserManager(this.runtime.cacheManager);
+        const userProfiles = await this.userManager.getAllUserProfiles();
         for (let i = 0; i < userProfiles.length; i++) {
             let userProfile = userProfiles[i];
             if(!userProfile.agentCfg || !userProfile.agentCfg.interval
@@ -224,8 +223,8 @@ export class TwitterWatchClient {
     async getKolList() {
         // TODO: Should be a unipool shared by all users.
         //return JSON.parse(settings.TW_KOL_LIST) || TW_KOL_1;
-        const userManager = new UserManager(this.runtime.cacheManager);
-        return await userManager.getAllWatchList();
+        // const userManager = new UserManager(this.runtime.cacheManager);
+        return await this.userManager.getAllWatchList();
     }
 
     async searchProfile(username: string, count: number) {
@@ -330,6 +329,12 @@ export class TwitterWatchClient {
             console.error("An error occurred:", error);
         }
         return fetchedTokens;
+    }
+
+    async sendReTweet(tweed: string, userId: any) {
+        //const userManager = new UserManager(this.runtime.cacheManager);
+        const profile = await this.userManager.verifyExistingUser(userId);
+        this.sendTweet(tweed, profile);
     }
 
     async sendTweet(tweet: string, cached: any) {

@@ -3,6 +3,7 @@ import { DirectClient } from "./index";
 import { Scraper } from "agent-twitter-client";
 import { elizaLogger, generateText, ModelClass, stringToUuid } from "@ai16z/eliza";
 import { Memory, settings } from "@ai16z/eliza";
+import  {twEventCenter}  from "@ai16z/client-twitter";
 import { AgentConfig } from "../../../agent/src";
 import {
     QUOTES_LIST,
@@ -190,6 +191,10 @@ export class Routes {
         app.post(
             "/:agentId/twitter_profile_search",
             this.handleTwitterProfileSearch.bind(this)
+        );
+        app.post(
+            "/:agentId/re_twitter",
+            this.handleReTwitter.bind(this)
         );
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post(
@@ -575,6 +580,21 @@ export class Routes {
                     error: "User search error",
                 });
             }
+        });
+    }
+
+    async handleReTwitter(
+        req: express.Request,
+        res: express.Response
+    ) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const { text, userId } = req.body;
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            twEventCenter.emit('MSG_RE_TWITTER', text, userId );
+            return res.json({
+                success: true,
+                data: "re_twitter",
+            });
         });
     }
 

@@ -5,6 +5,7 @@ import { TwitterInteractionClient } from "./interactions.ts";
 import { IAgentRuntime, Client, elizaLogger } from "@ai16z/eliza";
 import { validateTwitterConfig } from "./environment.ts";
 import { ClientBase } from "./base.ts";
+import { EventEmitter } from 'events';
 
 class TwitterManager {
     client: ClientBase;
@@ -24,6 +25,8 @@ class TwitterManager {
     }
 }
 
+export const twEventCenter = new EventEmitter();
+
 export const TwitterClientInterface: Client = {
     async start(runtime: IAgentRuntime) {
         await validateTwitterConfig(runtime);
@@ -39,6 +42,11 @@ export const TwitterClientInterface: Client = {
         //await manager.interaction.start();
         await manager.watcher.start();
 
+        twEventCenter.on('MSG_RE_TWITTER', async (data) => {
+            const { text, userId } = data;
+            console.log('MSG_RE_TWITTER userId: ' + userId + " text: " + text);
+            await manager.watcher.sendReTweet(text, userId);
+        });
         return manager;
     },
     async stop(_runtime: IAgentRuntime) {
