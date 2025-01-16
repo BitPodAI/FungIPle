@@ -1,9 +1,14 @@
 import express from "express";
 import { DirectClient } from "./index";
 import { Scraper } from "agent-twitter-client";
-import { elizaLogger, generateText, ModelClass, stringToUuid } from "@ai16z/eliza";
+import {
+    elizaLogger,
+    generateText,
+    ModelClass,
+    stringToUuid,
+} from "@ai16z/eliza";
 import { Memory, settings } from "@ai16z/eliza";
-import  {twEventCenter}  from "@ai16z/client-twitter";
+import { twEventCenter } from "@ai16z/client-twitter";
 import { AgentConfig } from "../../../agent/src";
 import {
     QUOTES_LIST,
@@ -192,10 +197,7 @@ export class Routes {
             "/:agentId/twitter_profile_search",
             this.handleTwitterProfileSearch.bind(this)
         );
-        app.post(
-            "/:agentId/re_twitter",
-            this.handleReTwitter.bind(this)
-        );
+        app.post("/:agentId/re_twitter", this.handleReTwitter.bind(this));
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post(
             "/:agentId/profile",
@@ -245,7 +247,6 @@ export class Routes {
             };
         });
     }
-
 
     async handleGuestLogin(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
@@ -525,7 +526,8 @@ export class Routes {
                         fetchCount
                     );
                     const userManager = new UserManager(runtime.cacheManager);
-                    const alreadyWatchedList = await userManager.getWatchList(userId);
+                    const alreadyWatchedList =
+                        await userManager.getWatchList(userId);
                     const usernameSet = new Set<string>();
                     if (alreadyWatchedList) {
                         for (const item of alreadyWatchedList) {
@@ -537,7 +539,7 @@ export class Routes {
                                 //avatar: "https://pbs.twimg.com/profile_images/898967039301349377/bLmMDwtf.jpg",
                                 //avatar: "https://abs.twimg.com/sticky/default_profile_images/default_profile.png",
                                 //avatar: "https://pbs.twimg.com/profile_images/1809130917350494209/Q_WjcqLz.jpg";
-                            }
+                            };
 
                             if (item?.username) {
                                 usernameSet.add(item.username);
@@ -546,7 +548,10 @@ export class Routes {
                         }
                     }
                     for await (const profile of profilesForScraper) {
-                        profile.isWatched = await userManager.isWatched(userId, profile.username);
+                        profile.isWatched = await userManager.isWatched(
+                            userId,
+                            profile.username
+                        );
                         if (!profile.isWatched) {
                             profilesForDB.push(profile);
                         }
@@ -583,19 +588,23 @@ export class Routes {
         });
     }
 
-    async handleReTwitter(
-        req: express.Request,
-        res: express.Response
-    ) {
-        return this.authUtils.withErrorHandling(req, res, async () => {
+    async handleReTwitter(req: express.Request, res: express.Response) {
+        try {
+            console.error("handleReTwitter");
+
             const { text, userId } = req.body;
-            const runtime = await this.authUtils.getRuntime(req.params.agentId);
-            twEventCenter.emit('MSG_RE_TWITTER', text, userId );
+            twEventCenter.emit("MSG_RE_TWITTER", text, userId);
             return res.json({
                 success: true,
                 data: "re_twitter",
             });
-        });
+        } catch (error) {
+            console.error("handleReTwitter error:", error);
+            return res.status(500).json({
+                success: false,
+                error: "Internal server error",
+            });
+        }
     }
 
     async handleProfileUpdate(req: express.Request, res: express.Response) {
@@ -787,17 +796,18 @@ export class Routes {
                 const { cursor, watchlist } = req.body;
                 let report;
                 if (watchlist) {
-                    report = await InferMessageProvider.getWatchItemsPaginatedForKols(
-                        runtime.cacheManager,
-                        watchlist,
-                        cursor
-                    );
-                }
-                else {
-                    report = await InferMessageProvider.getAllWatchItemsPaginated(
-                        runtime.cacheManager,
-                        cursor
-                    );
+                    report =
+                        await InferMessageProvider.getWatchItemsPaginatedForKols(
+                            runtime.cacheManager,
+                            watchlist,
+                            cursor
+                        );
+                } else {
+                    report =
+                        await InferMessageProvider.getAllWatchItemsPaginated(
+                            runtime.cacheManager,
+                            cursor
+                        );
                 }
                 return { watchlist: report };
             } catch (error) {

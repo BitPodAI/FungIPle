@@ -96,9 +96,11 @@ export class DirectClient {
         routes.setupRoutes(this.app);
 
         // This is an interface for debugging whether the network is connected or not
-        this.app.get('/hello', (req, res) => {
-            res.json('Hello, Web3 World!');
-          });
+        // host + env.SERVER_PORT + /hello
+        // eg: http://97.64.20.241:3000/hello
+        this.app.get("/hello", (req, res) => {
+            res.json("Hello, Web3 World!");
+        });
 
         // Define an interface that extends the Express Request interface
         interface CustomRequest extends ExpressRequest {
