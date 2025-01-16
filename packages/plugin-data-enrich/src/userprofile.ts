@@ -76,10 +76,7 @@ export class UserManager implements UserManageInterface {
     static ALL_USER_IDS: string = "USER_PROFILE_ALL_IDS_";
     idSet = new Set();
 
-    constructor(
-        private cacheManager: ICacheManager
-    ) {
-    }
+    constructor(private cacheManager: ICacheManager) {}
 
     private async readFromCache<T>(key: string): Promise<T | null> {
         const cached = await this.cacheManager.get<T>(key);
@@ -87,7 +84,7 @@ export class UserManager implements UserManageInterface {
     }
 
     private async writeToCache<T>(key: string, data: T): Promise<void> {
-        await this.cacheManager.set(key, data, {expires: 0}); //expires is NEED
+        await this.cacheManager.set(key, data, { expires: 0 }); //expires is NEED
     }
 
     private async getCachedData<T>(key: string): Promise<T | null> {
@@ -114,7 +111,9 @@ export class UserManager implements UserManageInterface {
     async getWatchList(userId: string): Promise<WatchItem[]> {
         // let watchList = new Set<string>();
         // // Get list by userId
-        let userProfile = await this.getCachedData<UserProfile>(userId as string);
+        let userProfile = await this.getCachedData<UserProfile>(
+            userId as string
+        );
         // if (userProfile?.twitterWatchList) {
         //     for (const watchItem of userProfile.twitterWatchList) {
         //         watchList.add(watchItem.username);
@@ -123,17 +122,20 @@ export class UserManager implements UserManageInterface {
         return Array.from(userProfile?.twitterWatchList);
     }
 
-
     async getAllWatchList(): Promise<string[]> {
         let watchList = new Set<string>();
         for (const kol of TW_KOL_1) {
             watchList.add(kol);
         }
         // Get All ids
-        let idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
+        let idsStr = (await this.getCachedData(
+            UserManager.ALL_USER_IDS
+        )) as string;
         let ids = new Set(JSON.parse(idsStr));
         for (const userid of ids.keys()) {
-            let userProfile = await this.getCachedData<UserProfile>(userid as string);
+            let userProfile = await this.getCachedData<UserProfile>(
+                userid as string
+            );
             if (userProfile && userProfile.twitterWatchList) {
                 for (const watchItem of userProfile.twitterWatchList) {
                     watchList.add(watchItem.username);
@@ -145,21 +147,22 @@ export class UserManager implements UserManageInterface {
     }
 
     //
-    async verifyExistingUser(
-        userId: string
-    ): Promise<UserProfile> {
+    async verifyExistingUser(userId: string): Promise<UserProfile> {
         const resp = await this.getCachedData<UserProfile>(userId);
         return resp;
     }
 
-    async saveUserData(
-        profile: UserProfile
-    ) {
+    async saveUserData(profile: UserProfile) {
         await this.setCachedData(profile.userId, profile);
-        let idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
+        let idsStr = (await this.getCachedData(
+            UserManager.ALL_USER_IDS
+        )) as string;
         let ids = new Set(JSON.parse(idsStr));
         ids.add(profile.userId);
-        await this.setCachedData(UserManager.ALL_USER_IDS, JSON.stringify(Array.from(ids)));
+        await this.setCachedData(
+            UserManager.ALL_USER_IDS,
+            JSON.stringify(Array.from(ids))
+        );
         this.idSet = ids;
     }
 
@@ -175,7 +178,9 @@ export class UserManager implements UserManageInterface {
     // Add this new method to the class
     async getAllUserProfiles(): Promise<UserProfile[]> {
         // Get all user IDs
-        const idsStr = await this.getCachedData(UserManager.ALL_USER_IDS) as string;
+        const idsStr = (await this.getCachedData(
+            UserManager.ALL_USER_IDS
+        )) as string;
         if (!idsStr) {
             return [];
         }
@@ -186,12 +191,12 @@ export class UserManager implements UserManageInterface {
         // Fetch all profiles using Promise.all for parallel execution
         const profiles = await Promise.all(
             ids.map(async (userId: string) => {
-                return await this.getCachedData(userId) as UserProfile;
+                return (await this.getCachedData(userId)) as UserProfile;
             })
         );
 
         // Filter out any null/undefined profiles
-        return profiles.filter(profile => profile != null);
+        return profiles.filter((profile) => profile != null);
     }
 
     createDefaultProfile(userId: string, gmail?: string): UserProfile {
@@ -214,7 +219,7 @@ export class UserManager implements UserManageInterface {
                 refreshToken: "",
                 expiresIn: 0,
             },
-            agentCfg :  {enabled: true, interval: "24h", imitate: "elonmusk"},
+            agentCfg: { enabled: false, interval: "24h", imitate: "elonmusk" },
             twitterWatchList: [],
             tweetFrequency: {
                 dailyLimit: 10,
@@ -233,7 +238,9 @@ export class UserManager implements UserManageInterface {
     async isWatched(userId: string, twUsername: string): Promise<boolean> {
         const profile = await this.getCachedData<UserProfile>(userId);
         if (profile && profile.twitterWatchList) {
-            return profile.twitterWatchList.some(item => item.username === twUsername);
+            return profile.twitterWatchList.some(
+                (item) => item.username === twUsername
+            );
         } else {
             return false;
         }

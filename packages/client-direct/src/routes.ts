@@ -380,12 +380,16 @@ export class Routes {
                 clientSecret: settings.TWITTER_CLIENT_SECRET,
             });
 
-            const { client: loggedClient, accessToken, refreshToken, expiresIn } =
-                await clientLog.loginWithOAuth2({
-                    code,
-                    codeVerifier,
-                    redirectUri: `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback?userId=${userId}`,
-                });
+            const {
+                client: loggedClient,
+                accessToken,
+                refreshToken,
+                expiresIn,
+            } = await clientLog.loginWithOAuth2({
+                code,
+                codeVerifier,
+                redirectUri: `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback?userId=${userId}`,
+            });
 
             let username = "";
             if (loggedClient) {
@@ -417,7 +421,7 @@ export class Routes {
                 refreshToken,
                 expiresIn,
             };
-
+            await this.handleGrowthExperience(20, userProfile, "twitter auth");
             await userManager.saveUserData(userProfile);
 
             //return { accessToken };
@@ -503,25 +507,27 @@ export class Routes {
         //});
     }
 
-    async handleTwitterOauthRevoke(req: express.Request, res: express.Response) {
+    async handleTwitterOauthRevoke(
+        req: express.Request,
+        res: express.Response
+    ) {
         return this.authUtils.withErrorHandling(req, res, async () => {
             const { userId } = req.query;
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             const userManager = new UserManager(runtime.cacheManager);
             const userProfile = await userManager.getUserProfile(userId);
             try {
-
                 const accessToken = userProfile.tweetProfile?.accessToken;
-                const urlRevoke = 'https://api.twitter.com/oauth2/revoke';
+                const urlRevoke = "https://api.twitter.com/oauth2/revoke";
                 const response = await fetch(urlRevoke, {
-                    method: 'POST',
+                    method: "POST",
                     headers: {
-                        'Authorization': `Bearer ${accessToken}`,  // 使用访问令牌进行认证
+                        Authorization: `Bearer ${accessToken}`, // 使用访问令牌进行认证
                     },
                 });
 
                 if (!response.ok) {
-                    console.error('Failed to revoke access token');
+                    console.error("Failed to revoke access token");
                 }
 
                 // Save userProfile
@@ -532,9 +538,9 @@ export class Routes {
                 await userManager.saveUserData(userProfile);
 
                 const data = await response.json();
-                console.log('Authorization revoked successfully:', data);
+                console.log("Authorization revoked successfully:", data);
             } catch (err) {
-                console.error('Twitter auth revoke error:', err);
+                console.error("Twitter auth revoke error:", err);
             }
 
             return { userProfile };
@@ -697,6 +703,37 @@ export class Routes {
                     profile.userId
                 );
 
+            if (profile?.bio && !existingProfile?.bio) {
+                this.handleGrowthExperience(
+                    20,
+                    profile,
+                    "agent name,gender,style config."
+                );
+            }
+            // console.log("growth experience: begin. ");
+            // console.log(
+            //     "growth experience: old: ",
+            //     existingProfile?.agentCfg?.enabled
+            // );
+            // console.log("growth experience: new: ", profile?.agentCfg?.enabled);
+
+            if (
+                profile?.agentCfg?.enabled &&
+                !existingProfile?.agentCfg?.enabled
+            ) {
+                this.handleGrowthExperience(20, profile, "enable agent.");
+            }
+            if (
+                (profile?.twitterWatchList?.length ?? 0) >
+                (existingProfile?.twitterWatchList?.length ?? 0)
+            ) {
+                this.handleGrowthExperience(
+                    10,
+                    profile,
+                    "watch a new twitter."
+                );
+            }
+
             const updatedProfile = { ...existingProfile, ...profile };
             const userManager = new UserManager(runtime.cacheManager);
             await userManager.updateProfile(updatedProfile);
@@ -836,6 +873,17 @@ export class Routes {
     async handleWatchText(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const userManager = new UserManager(runtime.cacheManager);
+            const profile = await userManager.verifyExistingUser(
+                req.body.userId
+            );
+            this.handleGrowthExperience(
+                10,
+                profile,
+                "watch the text message list"
+            );
+            userManager.saveUserData(profile);
+
             try {
                 const { cursor, watchlist } = req.body;
                 let report;
@@ -853,7 +901,7 @@ export class Routes {
                             cursor
                         );
                 }
-                return { watchlist: report };
+                return { watchlist: report, profile };
             } catch (error) {
                 console.error("Error fetching token data:", error);
                 return { report: "Watcher is in working, please wait." };
@@ -882,10 +930,13 @@ export class Routes {
                 response = response.replaceAll("```", "");
                 response = response.replace("json", "");
 
-                // TODO
-                //
-
-                return { response };
+                const userManager = new UserManager(runtime.cacheManager);
+                const profile = await userManager.verifyExistingUser(
+                    req.body.userId
+                );
+                this.handleGrowthExperience(5, profile, "chat with agent");
+                userManager.saveUserData(profile);
+                return { response, profile };
             } catch (error) {
                 console.error("Error response token question:", error);
                 return { response: "Response with error" };
@@ -962,4 +1013,29 @@ export class Routes {
             }
         });
     }*/
+
+    async handleGrowthExperience(exp: number, profile: any, reason: string) {
+        console.log(
+            "growth experience: before, ",
+            profile.userId,
+            profile.experience,
+            exp,
+            reason
+        );
+        let curlevel = profile.level;
+        let curexperience = profile.experience + exp;
+        if (curexperience >= 100) {
+            curexperience %= 100;
+            curlevel++;
+        }
+        profile.level = curlevel;
+        profile.experience = curexperience;
+        console.log(
+            "growth experience: after, ",
+            profile.userId,
+            profile.experience,
+            exp,
+            reason
+        );
+    }
 }
