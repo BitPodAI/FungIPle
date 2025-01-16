@@ -169,7 +169,7 @@ export class UserManager implements UserManageInterface {
             return null;
         }
 
-        return await this.getCachedData(userId) as UserProfile;
+        return await this.getCachedData<UserProfile>(userId);
     }
 
     // Add this new method to the class
