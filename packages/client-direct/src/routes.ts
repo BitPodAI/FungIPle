@@ -193,6 +193,10 @@ export class Routes {
             "/:agentId/twitter_oauth_callback",
             this.handleTwitterOauthCallback.bind(this)
         );
+        app.get(
+            "/:agentId/twitter_oauth_revoke",
+            this.handleTwitterOauthRevoke.bind(this)
+        );
         app.post(
             "/:agentId/twitter_profile_search",
             this.handleTwitterProfileSearch.bind(this)
@@ -291,13 +295,14 @@ export class Routes {
 
     async handleTwitterOauthInit(req: express.Request, res: express.Response) {
         return this.authUtils.withErrorHandling(req, res, async () => {
+            const { userId } = req.query;
             const client = new TwitterApi({
                 clientId: settings.TWITTER_CLIENT_ID,
                 clientSecret: settings.TWITTER_CLIENT_SECRET,
             });
 
             const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
-                `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback`,
+                `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback?userId=${userId}`,
                 {
                     scope: [
                         "tweet.read",
@@ -310,11 +315,14 @@ export class Routes {
 
             // Save state & codeVerifier
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const userManager = new UserManager(runtime.cacheManager);
+            const userProfile = await userManager.verifyExistingUser(userId);
+            userProfile.tweetProfile.codeVerifier = codeVerifier;
+            await userManager.saveUserData(userProfile);
             await runtime.cacheManager.set(
-                "oauth_verifier",
+                state,
                 JSON.stringify({
                     codeVerifier,
-                    state,
                     timestamp: Date.now(),
                 }),
                 {
@@ -342,9 +350,9 @@ export class Routes {
     ) {
         //return this.authUtils.withErrorHandling(req, res, async () => {
         // 1. Get code and state
-        const { code, state } = req.query;
+        const { code, state, userId } = req.query;
 
-        if (!code || !state) {
+        if (!code || !state || !userId) {
             res.status(200).json({ ok: true });
             return;
             //throw new ApiError(400, "Missing required OAuth parameters");
@@ -352,8 +360,7 @@ export class Routes {
 
         const runtime = await this.authUtils.getRuntime(req.params.agentId);
 
-        const verifierData = await runtime.cacheManager.get("oauth_verifier");
-
+        const verifierData = await runtime.cacheManager.get(state);
         if (!verifierData) {
             // error
             console.error(
@@ -368,42 +375,41 @@ export class Routes {
         const { codeVerifier, timestamp } = JSON.parse(verifierData);
 
         try {
-            const client = new TwitterApi({
+            const clientLog = new TwitterApi({
                 clientId: settings.TWITTER_CLIENT_ID,
                 clientSecret: settings.TWITTER_CLIENT_SECRET,
             });
 
-            const { accessToken, refreshToken, expiresIn } =
-                await client.loginWithOAuth2({
+            const { client: loggedClient, accessToken, refreshToken, expiresIn } =
+                await clientLog.loginWithOAuth2({
                     code,
                     codeVerifier,
-                    redirectUri: `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback`,
+                    redirectUri: `${settings.MY_APP_URL}/${req.params.agentId}/twitter_oauth_callback?userId=${userId}`,
                 });
 
             let username = "";
-            let email = "";
-            const me = await client.v2.me();
-            console.log("me is", me);
-            if (me?.data) {
-                username = me.data.username;
-                email = me.data.email;
+            if (loggedClient) {
+                const me = await loggedClient.v2.me();
+                if (me?.data) {
+                    username = me.data.username;
+                    //name = me.data.name;
+                }
             }
 
             // Clear
             await runtime.databaseAdapter?.deleteCache({
-                agentId: state,
-                key: "oauth_verifier",
+                agentId: req.params.agentId,
+                key: state,
             });
 
             // Save twitter profile
             // TODO: encrypt token
-            //const userId = req.params.agentId;
-            const userId = stringToUuid(username);
+            //const userId = stringToUuid(username);
             const userManager = new UserManager(runtime.cacheManager);
-            const userProfile = userManager.createDefaultProfile(userId);
+            const userProfile = await userManager.getUserProfile(userId);
             userProfile.tweetProfile = {
                 username,
-                email,
+                email: "",
                 avatar: "",
                 code,
                 codeVerifier,
@@ -411,10 +417,6 @@ export class Routes {
                 refreshToken,
                 expiresIn,
             };
-
-            //await runtime.cacheManager.set("userProfile", JSON.stringify(userProfile), {
-            //    expires: Date.now() + 2 * 60 * 60 * 1000,
-            //});
 
             await userManager.saveUserData(userProfile);
 
@@ -464,6 +466,10 @@ export class Routes {
                                         window.opener.postMessage({
                                             type: 'TWITTER_AUTH_SUCCESS',
                                             code: '${code}',
+                                            username: '${username}',
+                                            accessToken: '${accessToken}',
+                                            refreshToken: '${refreshToken}',
+                                            expiresIn: '${expiresIn}',
                                             state: '${state}'
                                         },
                                         '*'
@@ -495,6 +501,44 @@ export class Routes {
             res.status(500).json({ error: "Internal server error" });
         }
         //});
+    }
+
+    async handleTwitterOauthRevoke(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const { userId } = req.query;
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const userManager = new UserManager(runtime.cacheManager);
+            const userProfile = await userManager.getUserProfile(userId);
+            try {
+
+                const accessToken = userProfile.tweetProfile?.accessToken;
+                const urlRevoke = 'https://api.twitter.com/oauth2/revoke';
+                const response = await fetch(urlRevoke, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,  // 使用访问令牌进行认证
+                    },
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to revoke access token');
+                }
+
+                // Save userProfile
+                userProfile.tweetProfile.code = "";
+                userProfile.tweetProfile.codeVerifier = "";
+                userProfile.tweetProfile.accessToken = "";
+                userProfile.tweetProfile.refreshToken = "";
+                await userManager.saveUserData(userProfile);
+
+                const data = await response.json();
+                console.log('Authorization revoked successfully:', data);
+            } catch (err) {
+                console.error('Twitter auth revoke error:', err);
+            }
+
+            return { userProfile };
+        });
     }
 
     async handleTwitterProfileSearch(

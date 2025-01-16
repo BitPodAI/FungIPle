@@ -42,9 +42,9 @@ export const STYLE_LIST = [
     "Logical",
     "Humorous",
     "Cautious",
-    "Professional & Rigorous",
-    "Optimistic & Positive",
-    "Bold & Proactive",
+    //"Professional & Rigorous",
+    //"Optimistic & Positive",
+    //"Bold & Proactive",
 ];
 
 export const QUOTES_LIST = [
