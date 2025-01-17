@@ -101,7 +101,9 @@ export class UserManager implements UserManageInterface {
     }
 
     async updateProfile(profile: UserProfile) {
-        await this.setCachedData(profile.userId, profile);
+        if (profile) {
+            await this.setCachedData(profile.userId, profile);
+        }
     }
 
     updateWatchList(userId: string, list: WatchItem[]): void {
@@ -153,6 +155,9 @@ export class UserManager implements UserManageInterface {
     }
 
     async saveUserData(profile: UserProfile) {
+        if (!profile) {
+            return;
+        }
         await this.setCachedData(profile.userId, profile);
         let idsStr = (await this.getCachedData(
             UserManager.ALL_USER_IDS

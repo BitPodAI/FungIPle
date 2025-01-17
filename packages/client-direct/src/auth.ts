@@ -49,3 +49,19 @@ export const requireAuth: RequestHandler = (req, res, next) => {
         next();
     }
 };
+
+/**
+ * Express Middleware for Exception Handler
+ * @param req
+ * @param res
+ * @param next
+ */
+export const exceptionHandler = async (req, res, next) => {
+    try {
+        next();
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal system error." });
+    }
+};
