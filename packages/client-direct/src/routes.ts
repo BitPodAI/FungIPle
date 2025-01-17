@@ -202,6 +202,7 @@ export class Routes {
             this.handleTwitterProfileSearch.bind(this)
         );
         app.post("/:agentId/re_twitter", this.handleReTwitter.bind(this));
+        app.post("/:agentId/translate_text", this.handleTranslateText.bind(this));
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post(
             "/:agentId/profile",
@@ -640,7 +641,7 @@ export class Routes {
 
     async handleReTwitter(req: express.Request, res: express.Response) {
         try {
-            console.error("handleReTwitter");
+            console.log("handleReTwitter");
 
             const { text, userId } = req.body;
             twEventCenter.emit("MSG_RE_TWITTER", text, userId);
@@ -650,6 +651,41 @@ export class Routes {
             });
         } catch (error) {
             console.error("handleReTwitter error:", error);
+            return res.status(500).json({
+                success: false,
+                error: "Internal server error",
+            });
+        }
+    }
+
+    async handleTranslateText(req: express.Request, res: express.Response) {
+        try {
+            console.log("handleTranslateText 1");
+            const { text } = req.body;
+            console.log("handleTranslateText 2" + text);
+
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const prompt = "You are a helpful translator. If the following text is in English, please translate it into Chinese. If it is in another language, translate it into English; The returned result only includes the translated result,The JSON structure of the returned result is: {\"result\":\"\"}. The text that needs to be translated starts with [Text]. [TEXT]: " + text;
+            //console.log("handleTranslateText 3" + prompt);
+
+            let response = await generateText({
+                    runtime: runtime,
+                    context: prompt,
+                    modelClass: ModelClass.SMALL,
+                });
+            //console.log("handleTranslateText 4" + response);
+
+            if (!response) {
+                throw new Error("No response from generateText");
+            }
+            // response struct: {"result":""}
+            let responseObj = JSON.parse(response);
+            return res.json({
+                success: true,
+                data: responseObj,
+            });
+        } catch (error) {
+            console.error("handleTranslateText error:", error);
             return res.status(500).json({
                 success: false,
                 error: "Internal server error",
@@ -1015,6 +1051,9 @@ export class Routes {
     }*/
 
     async handleGrowthExperience(exp: number, profile: any, reason: string) {
+        if(!profile) {
+            return;
+        }
         console.log(
             "growth experience: before, ",
             profile.userId,
