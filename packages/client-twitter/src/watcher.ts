@@ -156,7 +156,7 @@ export class TwitterWatchClient {
         prompt += "Twitter content is after the keyword [Twitter],";
         prompt += "\n[Twitter]:";
         prompt += text;
-        prompt += 'Your return format is JSON structure: {"resultText": ""}.';
+        prompt += 'Your return result only contains JSON structure: {"resultText": ""}, and no other text should be provided.';
         return prompt;
     }
     async runTask() {
@@ -233,6 +233,10 @@ export class TwitterWatchClient {
                             context: prompt,
                             modelClass: ModelClass.LARGE,
                         });
+                        console.log(
+                            "sendTweet in loop Part4: responseStr: ",
+                            responseStr
+                        );
                         let responseObj = JSON.parse(responseStr);
                         const { resultText } = responseObj;
                         console.log(
@@ -275,7 +279,7 @@ export class TwitterWatchClient {
         });*/
         this.intervalId = setInterval(
             () => this.runTask(),
-            (this.sendingTwitterDebug ? 6000 : SEND_TWITTER_INTERNAL)
+            (this.sendingTwitterDebug ? 120000 : SEND_TWITTER_INTERNAL)
         );
         const genReportLoop = async () => {
             elizaLogger.log("TwitterWatcher loop");
@@ -458,6 +462,10 @@ export class TwitterWatchClient {
             modelClass: ModelClass.LARGE,
         });
 
+        console.log(
+            "sendTweet in share Part5: responseStr: ",
+            responseStr
+        );
         let responseObj = JSON.parse(responseStr);
 
         const { resultText } = responseObj;
@@ -657,7 +665,7 @@ function parseTweetV2ToV1(
       place: defaultTweetData?.place,
       thread: defaultTweetData?.thread ?? [],
     };
-  
+
     // Process Polls
     if (includes?.polls?.length) {
       const poll = includes.polls[0];
@@ -677,7 +685,7 @@ function parseTweetV2ToV1(
           poll.voting_status ?? defaultTweetData?.poll?.voting_status,
       };
     }
-  
+
     // Process User (for author info)
     if (includes?.users?.length) {
       const user = includes.users.find(
@@ -688,7 +696,7 @@ function parseTweetV2ToV1(
         parsedTweet.name = user.name ?? defaultTweetData?.name ?? '';
       }
     }
-  
+
     // TODO: Process Thread (referenced tweets) and remove reference to v1
     return parsedTweet;
 }
