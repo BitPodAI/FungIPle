@@ -85,6 +85,7 @@ export class TwitterWatchClient {
         );
         this.userManager = new UserManager(this.runtime.cacheManager);
         this.sendingTwitterInLooping = false;
+        this.sendingTwitterDebug = true;
     }
 
     convertTimeToMilliseconds(timeStr: string): number {
@@ -167,11 +168,16 @@ export class TwitterWatchClient {
             if (!enabled) {
                 continue;
             }
+            if(!(userProfile?.tweetProfile?.accessToken)) {
+                console.error("sendTweet in Loop Twitter Access token not found");
+                continue;
+                //throw new Error("Send Twitter in Loop Twitter Access token not found");
+            }
             const lastTweetTime = userProfile.tweetFrequency.lastTweetTime;
             if (
                 Date.now() - lastTweetTime >
-                //60000
-                this.convertTimeToMilliseconds(interval)
+                (this.sendingTwitterDebug? 60000:
+                this.convertTimeToMilliseconds(interval))
             ) {
                 userProfile.tweetFrequency.lastTweetTime = Date.now();
                 this.userManager.saveUserData(userProfile);
@@ -206,7 +212,7 @@ export class TwitterWatchClient {
 
                         const prompt = this.generatePrompt(imitate, part2);
                         console.log(
-                            "Watcher sendTweet Part4: prompt: ",
+                            "sendTweet in loop Part4: prompt: ",
                             prompt
                         );
 
@@ -218,7 +224,7 @@ export class TwitterWatchClient {
                         let responseObj = JSON.parse(responseStr);
                         const { resultText } = responseObj;
                         console.log(
-                            "Watcher sendTweet Part 5: response: ",
+                            "sendTweet in loop Part 5: response: ",
                             resultText
                         );
 
@@ -228,11 +234,11 @@ export class TwitterWatchClient {
                         );
                     } else {
                         elizaLogger.log(
-                            "Twitter Sender msg is null, skip this time"
+                            "sendTweet in loop msg is null, skip this time"
                         );
                     }
                 } catch (error) {
-                    console.error("Twitter Sender task: ", error);
+                    console.error("sendTweet in loop Sender task: ", error);
                 }
             }
         }
@@ -240,6 +246,7 @@ export class TwitterWatchClient {
     }
     intervalId: NodeJS.Timeout;
     sendingTwitterInLooping: boolean;
+    sendingTwitterDebug: boolean;
 
     async start() {
         console.log("TwitterWatcher start");
@@ -256,10 +263,8 @@ export class TwitterWatchClient {
         });*/
         this.intervalId = setInterval(
             () => this.runTask(),
-            SEND_TWITTER_INTERNAL
+            (this.sendingTwitterDebug ? 6000 : SEND_TWITTER_INTERNAL)
         );
-        // this.intervalId = setInterval(() => this.runTask(), 60000); // : todo 当前人物有在执行就不会，再覆盖。
-        // this.runTask();
         const genReportLoop = async () => {
             elizaLogger.log("TwitterWatcher loop");
             const lastGen = await this.runtime.cacheManager.get<{
@@ -277,8 +282,7 @@ export class TwitterWatchClient {
 
             setTimeout(() => {
                 genReportLoop(); // Set up next iteration
-            }, GEN_TOKEN_REPORT_DELAY);
-            // }, 60000);
+            }, (this.sendingTwitterDebug ? 50000 : GEN_TOKEN_REPORT_DELAY));
 
             console.log(
                 `Next tweet scheduled in ${GEN_TOKEN_REPORT_DELAY / 60 / 1000} minutes`
@@ -409,6 +413,11 @@ export class TwitterWatchClient {
     async sendReTweet(tweed: string, userId: any) {
         //const userManager = new UserManager(this.runtime.cacheManager);
         const profile = await this.userManager.verifyExistingUser(userId);
+        if(!(profile?.tweetProfile?.accessToken)) {
+            console.error("sendTweet in share Twitter Access token not found");
+            return;
+            // throw new Error("Twitter Access token not found");
+        }
         const firstSplit = tweed.split(":");
         const part1 = firstSplit[0];
         const remainingPart = firstSplit.slice(1).join(":");
@@ -433,13 +442,13 @@ export class TwitterWatchClient {
         let responseObj = JSON.parse(responseStr);
 
         const { resultText } = responseObj;
-        console.log("Watcher reTweet Part7: resultText: ", resultText);
+        console.log("sendTweet in share Part7: resultText: ", resultText);
         let finalResult = part1 + ":" + resultText + "\n\n" + part3;
         this.sendTweet(finalResult, JSON.stringify(profile));
     }
 
     async sendTweet(tweetDataText: string, cached: string) {
-        console.log("Watcher sendTweet tweetDataText: " + tweetDataText);
+        console.log("sendTweet in sending tweetDataText: " + tweetDataText);
         try {
             // Parse the tweet object
             //const tweetData = JSON.parse(tweet || `{}`);
@@ -458,13 +467,13 @@ export class TwitterWatchClient {
 
                     // Check if the client is working
                     const me = await twitterClient.v2.me();
-                    console.log("Watcher sendTweet v2 auth Success: ", me.data);
+                    console.log("sendTweet in sending v2 auth Success: ", me.data);
                     if (me.data) {
                         const tweetResponse = await twitterClient.v2.tweet({
                             text: tweetDataText,
                         });
                         console.log(
-                            "Watcher sendTweet v2 result: ",
+                            "sendTweet in sending v2 result: ",
                             tweetResponse
                         );
                     }
@@ -483,13 +492,13 @@ export class TwitterWatchClient {
             }
 
             // Send the tweet self if no OAuth2
-            const result = await this.client.requestQueue.add(
-                async () =>
-                    await this.client.twitterClient.sendTweet(tweetDataText)
-            );
-            console.log("Watcher sendTweet v1 result:", result);
+            // const result = await this.client.requestQueue.add(
+            //     async () =>
+            //         await this.client.twitterClient.sendTweet(tweetDataText)
+            // );
+            // console.log("Watcher sendTweet v1 result:", result);
         } catch (error) {
-            console.error("Watcher sendTweet error: ", error);
+            console.error("sendTweet in sending error: ", error);
         }
     }
 }
