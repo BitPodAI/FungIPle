@@ -12,7 +12,19 @@ import {
     settings,
 } from "@ai16z/eliza";
 import { ClientBase } from "./base";
-import { TwitterApi } from "twitter-api-v2";
+import {
+    ApiV2Includes,
+    TweetV2,
+    TwitterApi,
+    TTweetv2Expansion,
+    //TTweetv2MediaField,
+    //TTweetv2PlaceField,
+    TTweetv2PollField,
+    TTweetv2TweetField,
+    TTweetv2UserField,
+    UserV2,
+  } from 'twitter-api-v2';
+  import { Tweet } from "agent-twitter-client";
 
 const WATCHER_INSTRUCTION = `
 Please find the following data according to the text provided in the following format:
@@ -65,7 +77,7 @@ ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
 const TWEET_COUNT_PER_TIME = 20; //count related to timeline
-const TWEET_TIMELINE = 60 * 60 * 2; //timeline related to count
+const TWEET_TIMELINE = 60 * 60 * 1; //timeline related to count
 const GEN_TOKEN_REPORT_DELAY = 1000 * TWEET_TIMELINE;
 const SEND_TWITTER_INTERNAL = 1000 * 60 * 60;
 
@@ -327,14 +339,21 @@ export class TwitterWatchClient {
                 TWEET_TIMELINE -
                 60 * 60 * 24;
             const kolList = await this.getKolList();
+            let index = 0;
             for (const kol of kolList) {
                 let kolTweets = [];
-                let tweets =
-                    await this.client.twitterClient.getTweetsAndReplies(
+                let tweets = [];
+                if (index++ < 20) {
+                    tweets = await this.client.twitterClient.getTweetsAndReplies(
                         kol,
                         TWEET_COUNT_PER_TIME
                     );
-                // Fetch and process tweets
+                }
+                else {
+                    tweets = await this.getTweetV2(kol, TWEET_COUNT_PER_TIME);
+                    console.log(tweets.length);
+                }
+                // Fetch and process tweetsss
                 try {
                     for await (const tweet of tweets) {
                         if (tweet.timestamp < timeline) {
@@ -501,4 +520,175 @@ export class TwitterWatchClient {
             console.error("sendTweet in sending error: ", error);
         }
     }
+
+    // Get Tweet by V2 per user
+    async getTweetV2(kolname: string, count: number) {
+        console.log("Watcher getTweetV2");
+        try {
+            const accessToken = await this.userManager.getUserTwitterAccessTokenSequence();
+            if (accessToken) {
+                // New Twitter API v2 by access token
+                const twitterClient = new TwitterApi(accessToken);
+
+                // Check if the client is working
+                const me = await twitterClient.v2.me();
+                console.log("Watcher getTweetV2 auth Success: ", me.data);
+                if (me.data) {
+                    const params = {
+                        max_results: count, // 5-100
+                        pagination_token: undefined,
+                        //exclude: [],
+                        expansions: defaultOptions.expansions,
+                        'tweet.fields': defaultOptions.tweetFields,
+                        'user.fields': defaultOptions.userFields,
+                    };
+                    const kolid = await this.client.twitterClient.getUserIdByScreenName(kolname);
+                    const tweets = await twitterClient.v2.userTimeline(kolid, params);
+                    //console.log("getTweetV2 result: ", tweets);
+                    return tweets._realData?.data.map((tweet: TweetV2) => parseTweetV2ToV1(tweet, tweets._realData?.includes));
+                }
+            }
+
+        } catch (error) {
+            console.error("Watcher getTweetV2 error: ", error);
+        }
+        return [];
+    }
+}
+
+export const defaultOptions = {
+    expansions: [
+      'attachments.poll_ids',
+      'attachments.media_keys',
+      'author_id',
+      'referenced_tweets.id',
+      'in_reply_to_user_id',
+      'edit_history_tweet_ids',
+      'geo.place_id',
+      'entities.mentions.username',
+      'referenced_tweets.id.author_id',
+    ] as TTweetv2Expansion[],
+    tweetFields: [
+      'attachments',
+      'author_id',
+      'context_annotations',
+      'conversation_id',
+      'created_at',
+      'entities',
+      'geo',
+      'id',
+      'in_reply_to_user_id',
+      'lang',
+      'public_metrics',
+      'edit_controls',
+      'possibly_sensitive',
+      'referenced_tweets',
+      'reply_settings',
+      'source',
+      'text',
+      'withheld',
+      'note_tweet',
+    ] as TTweetv2TweetField[],
+    pollFields: [
+      'duration_minutes',
+      'end_datetime',
+      'id',
+      'options',
+      'voting_status',
+    ] as TTweetv2PollField[],
+    userFields: [
+      'created_at',
+      'description',
+      'entities',
+      'id',
+      'location',
+      'name',
+      'profile_image_url',
+      'protected',
+      'public_metrics',
+      'url',
+      'username',
+      'verified',
+      'withheld',
+    ] as TTweetv2UserField[],
+};
+
+function parseTweetV2ToV1(
+    tweetV2: TweetV2,
+    includes?: ApiV2Includes,
+    defaultTweetData?: Tweet | null,
+  ): Tweet {
+    let parsedTweet: Tweet;
+    if (defaultTweetData != null) {
+      parsedTweet = defaultTweetData;
+    }
+    parsedTweet = {
+      id: tweetV2.id,
+      text: tweetV2.text ?? defaultTweetData?.text ?? '',
+      hashtags:
+        tweetV2.entities?.hashtags?.map((tag) => tag.tag) ??
+        defaultTweetData?.hashtags ??
+        [],
+      mentions:
+        tweetV2.entities?.mentions?.map((mention) => ({
+          id: mention.id,
+          username: mention.username,
+        })) ??
+        defaultTweetData?.mentions ??
+        [],
+      urls:
+        tweetV2.entities?.urls?.map((url) => url.url) ??
+        defaultTweetData?.urls ??
+        [],
+      likes: tweetV2.public_metrics?.like_count ?? defaultTweetData?.likes ?? 0,
+      retweets:
+        tweetV2.public_metrics?.retweet_count ?? defaultTweetData?.retweets ?? 0,
+      replies:
+        tweetV2.public_metrics?.reply_count ?? defaultTweetData?.replies ?? 0,
+      views:
+        tweetV2.public_metrics?.impression_count ?? defaultTweetData?.views ?? 0,
+      userId: tweetV2.author_id ?? defaultTweetData?.userId,
+      conversationId: tweetV2.conversation_id ?? defaultTweetData?.conversationId,
+      photos: defaultTweetData?.photos ?? [],
+      videos: defaultTweetData?.videos ?? [],
+      poll: defaultTweetData?.poll ?? null,
+      username: defaultTweetData?.username ?? '',
+      name: defaultTweetData?.name ?? '',
+      place: defaultTweetData?.place,
+      thread: defaultTweetData?.thread ?? [],
+    };
+  
+    // Process Polls
+    if (includes?.polls?.length) {
+      const poll = includes.polls[0];
+      parsedTweet.poll = {
+        id: poll.id,
+        end_datetime: poll.end_datetime
+          ? poll.end_datetime
+          : defaultTweetData?.poll?.end_datetime
+          ? defaultTweetData?.poll?.end_datetime
+          : undefined,
+        options: poll.options.map((option) => ({
+          position: option.position,
+          label: option.label,
+          votes: option.votes,
+        })),
+        voting_status:
+          poll.voting_status ?? defaultTweetData?.poll?.voting_status,
+      };
+    }
+  
+    // Process User (for author info)
+    if (includes?.users?.length) {
+      const user = includes.users.find(
+        (user: UserV2) => user.id === tweetV2.author_id,
+      );
+      if (user) {
+        parsedTweet.username = user.username ?? defaultTweetData?.username ?? '';
+        parsedTweet.name = user.name ?? defaultTweetData?.name ?? '';
+      }
+    }
+  
+    // TODO: Process Thread (referenced tweets) and remove reference to v1
+    return parsedTweet;
 }
