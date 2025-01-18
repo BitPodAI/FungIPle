@@ -5,14 +5,11 @@ import cors from "cors";
 import { AgentRuntime } from "@ai16z/eliza";
 
 import { REST, Routes } from "discord.js";
-import { exceptionHandler, parseToken } from "./auth";
 
 export function createApiRouter(agents: Map<string, AgentRuntime>) {
     const router = express.Router();
 
-    router.use(exceptionHandler);
     router.use(cors());
-    router.use(parseToken);
     router.use(bodyParser.json());
     router.use(bodyParser.urlencoded({ extended: true }));
 
