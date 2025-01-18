@@ -12,7 +12,7 @@ Authorization: Bearer {privyToken}
  }
 
 ###  删除指定的 memo
-POST http://localhost:3000/{agenId}/memo
+DELETE http://localhost:3000/{agenId}/memo
 Authorization: Bearer {privyToken}
 
 [
