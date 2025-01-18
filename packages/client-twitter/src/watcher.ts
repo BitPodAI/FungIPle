@@ -97,7 +97,7 @@ export class TwitterWatchClient {
         );
         this.userManager = new UserManager(this.runtime.cacheManager);
         this.sendingTwitterInLooping = false;
-        this.sendingTwitterDebug = true;
+        this.sendingTwitterDebug = false;
     }
 
     convertTimeToMilliseconds(timeStr: string): number {
