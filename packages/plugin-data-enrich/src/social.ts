@@ -3,13 +3,12 @@ import { Scraper } from "agent-twitter-client";
 
 // Pre Defined Twitter KOL
 export const TW_KOL_1 = [
-    "jessepollak",
     "elonmusk",
     "cz_binance",
-    "0xRodney",
-    "Buddy",
-    "DavidAirey",
-    "alex_fazel",
+    "aeyakovenko",
+    "jessepollak",
+    "shawmakesmagic",
+    "everythingempt0",
 ];
 
 export const TW_KOL_2 = [
@@ -43,9 +42,9 @@ export const STYLE_LIST = [
     "Logical",
     "Humorous",
     "Cautious",
-    "Professional & Rigorous",
-    "Optimistic & Positive",
-    "Bold & Proactive",
+    //"Professional & Rigorous",
+    //"Optimistic & Positive",
+    //"Bold & Proactive",
 ];
 
 export const QUOTES_LIST = [

@@ -1,0 +1,21 @@
+###  获取当前用户的memo列表
+GET http://localhost:3000/{agenId}/memo
+Authorization: Bearer {privyToken}
+
+### 添加一个memo
+POST http://localhost:3000/{agenId}/memo
+Authorization: Bearer {privyToken}
+
+# 字段可以自己设置，后端没有校验，保存时会加上 id 和 userId
+ {
+    "content": "....."
+ }
+
+###  删除指定的 memo
+DELETE http://localhost:3000/{agenId}/memo
+Authorization: Bearer {privyToken}
+
+[
+    "memoId1",
+    "memoId2"
+]

@@ -1,17 +1,30 @@
 import {
     TW_KOL_1,
+    UserManager,
     ConsensusProvider,
     InferMessageProvider,
 } from "@ai16z/plugin-data-enrich";
 import {
+    elizaLogger,
     generateText,
     IAgentRuntime,
     ModelClass,
     settings,
 } from "@ai16z/eliza";
 import { ClientBase } from "./base";
-import { TwitterApi } from 'twitter-api-v2';
-
+import {
+    ApiV2Includes,
+    TweetV2,
+    TwitterApi,
+    TTweetv2Expansion,
+    //TTweetv2MediaField,
+    //TTweetv2PlaceField,
+    TTweetv2PollField,
+    TTweetv2TweetField,
+    TTweetv2UserField,
+    UserV2,
+  } from 'twitter-api-v2';
+  import { Tweet } from "agent-twitter-client";
 
 const WATCHER_INSTRUCTION = `
 Please find the following data according to the text provided in the following format:
@@ -63,15 +76,17 @@ Note that {{agentName}} is capable of reading/analysis various forms of text, in
 ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
-const TWEET_COUNT_PER_TIME = 20;      //count related to timeline
-const TWEET_TIMELINE = 60 * 60 * 8;   //timeline related to count
+const TWEET_COUNT_PER_TIME = 20; //count related to timeline
+const TWEET_TIMELINE = 60 * 60 * 1; //timeline related to count
 const GEN_TOKEN_REPORT_DELAY = 1000 * TWEET_TIMELINE;
+const SEND_TWITTER_INTERNAL = 1000 * 60 * 60;
 
 export class TwitterWatchClient {
     client: ClientBase;
     runtime: IAgentRuntime;
     consensus: ConsensusProvider;
     inferMsgProvider: InferMessageProvider;
+    userManager: UserManager;
 
     constructor(client: ClientBase, runtime: IAgentRuntime) {
         this.client = client;
@@ -80,7 +95,174 @@ export class TwitterWatchClient {
         this.inferMsgProvider = new InferMessageProvider(
             this.runtime.cacheManager
         );
+        this.userManager = new UserManager(this.runtime.cacheManager);
+        this.sendingTwitterInLooping = false;
+        this.sendingTwitterDebug = false;
     }
+
+    convertTimeToMilliseconds(timeStr: string): number {
+        switch (timeStr) {
+            case "1h":
+                return 1 * 60 * 60 * 1000; // 1 hour in milliseconds
+            case "2h":
+                return 2 * 60 * 60 * 1000; // 2 hour in milliseconds
+            case "3h":
+                return 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+            case "12h":
+                return 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+            case "24h":
+                return 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            default:
+                return 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        }
+    }
+    generatePrompt(imitate: string, text: string): string {
+        let prompt =
+            "Here is your personality introduction and Twitter style, and Please imitate the style of the characters below and modify the Twitter content afterwards. Style: ";
+        switch (imitate) {
+            case "elonmusk":
+                prompt +=
+                    "Elon Musk is known for his highly innovative and adventurous spirit, with a strong curiosity and drive for pushing boundaries.Elon’s tweets are direct and full of personality. He often posts short, humorous, and at times provocative content.";
+                break;
+
+            case "cz_binance":
+                prompt +=
+                    "CZ is a pragmatic and calm entrepreneur, skilled in handling complex market issues.CZ's tweets are usually concise and informative, focusing on cryptocurrency news, Binance updates, and industry trends.";
+                break;
+
+            case "aeyakovenko":
+                prompt +=
+                    "the founder of Solana, is seen as a highly focused individual who pays close attention to technical details.Yakovenko’s tweets are more technical, often discussing the future development of blockchain technologies, Solana's progress, and major industry challenges. ";
+                break;
+
+            case "jessepollak":
+                prompt +=
+                    "Jesse Pollak is someone with a strong passion for technology and community. He is an active figure in the cryptocurrency community, especially in areas like technical development and user experience, and he has an innovative mindset.Jesse’s tweets are typically concise and easy to understand, showcasing his personal style.";
+                break;
+
+            case "shawmakesmagic":
+                prompt +=
+                    "Shawn is a creative individual who enjoys exploring innovative projects and cutting-edge technologies.His tweets are generally creative, often sharing innovative applications of blockchain technology or topics related to magic, fantasy, and imagination.";
+                break;
+
+            case "everythingempt":
+                prompt +=
+                    "Everythingempt is Openness,Conscientiousness,Extraversion,Agreeableness. Twitter's style is Minimalist,Customized Experience,Selective Content";
+                break;
+
+            default:
+                break;
+        }
+        prompt += "Twitter content is after the keyword [Twitter],";
+        prompt += "\n[Twitter]:";
+        prompt += text;
+        prompt += 'Your return result only contains JSON structure: {"resultText": ""}, and no other text should be provided.';
+        return prompt;
+    }
+    async runTask() {
+        if (this.sendingTwitterInLooping) {
+            return;
+        }
+        this.sendingTwitterInLooping = true;
+        elizaLogger.log("Twitter Sender task loop");
+        // const userManager = new UserManager(this.runtime.cacheManager);
+        const userProfiles = await this.userManager.getAllUserProfiles();
+        for (let i = 0; i < userProfiles.length; i++) {
+            let userProfile = userProfiles[i];
+            if (
+                !userProfile.agentCfg ||
+                !userProfile.agentCfg.interval ||
+                !userProfile.agentCfg.imitate
+            ) {
+                continue;
+            }
+            const { enabled, interval, imitate } = userProfile.agentCfg;
+            if (!enabled) {
+                continue;
+            }
+            if(!(userProfile?.tweetProfile?.accessToken)) {
+                console.error("sendTweet in Loop Twitter Access token not found");
+                continue;
+                //throw new Error("Send Twitter in Loop Twitter Access token not found");
+            }
+            const lastTweetTime = userProfile.tweetFrequency.lastTweetTime;
+            if (
+                Date.now() - lastTweetTime >
+                (this.sendingTwitterDebug? 60000:
+                this.convertTimeToMilliseconds(interval))
+            ) {
+                userProfile.tweetFrequency.lastTweetTime = Date.now();
+                this.userManager.saveUserData(userProfile);
+                try {
+                    let tweet =
+                        await InferMessageProvider.getAllWatchItemsPaginated(
+                            this.runtime.cacheManager
+                        );
+                    if (tweet) {
+                        let len = tweet?.items.length;
+                        if (len <= 0) {
+                            continue;
+                        }
+
+                        let contentText = tweet?.items[len - 1].text;
+                        const firstSplit = contentText.split(":");
+                        const part1 = firstSplit[0];
+                        const remainingPart = firstSplit.slice(1).join(":");
+
+                        const actualNewLines = remainingPart.replace(
+                            /\\r\\n/g,
+                            "\r\n"
+                        );
+                        const secondSplit = actualNewLines.split("\r\n\r\n");
+
+                        const part2 = secondSplit[0];
+                        const part3 = secondSplit.slice(1).join("  ").trim();
+
+                        // console.log("Watcher sendTweet Part1:", part1);
+                        // console.log("Watcher sendTweet Part2:", part2);
+                        // console.log("Watcher sendTweet Part3:", part3);
+
+                        const prompt = this.generatePrompt(imitate, part2);
+                        console.log(
+                            "sendTweet in loop Part4: prompt: ",
+                            prompt
+                        );
+
+                        let responseStr = await generateText({
+                            runtime: this.runtime,
+                            context: prompt,
+                            modelClass: ModelClass.LARGE,
+                        });
+                        console.log(
+                            "sendTweet in loop Part4: responseStr: ",
+                            responseStr
+                        );
+                        let responseObj = JSON.parse(responseStr);
+                        const { resultText } = responseObj;
+                        console.log(
+                            "sendTweet in loop Part 5: response: ",
+                            resultText
+                        );
+
+                        await this.sendTweet(
+                            resultText,
+                            JSON.stringify(userProfile)
+                        );
+                    } else {
+                        elizaLogger.log(
+                            "sendTweet in loop msg is null, skip this time"
+                        );
+                    }
+                } catch (error) {
+                    console.error("sendTweet in loop Sender task: ", error);
+                }
+            }
+        }
+        this.sendingTwitterInLooping = false;
+    }
+    intervalId: NodeJS.Timeout;
+    sendingTwitterInLooping: boolean;
+    sendingTwitterDebug: boolean;
 
     async start() {
         console.log("TwitterWatcher start");
@@ -89,8 +271,18 @@ export class TwitterWatchClient {
         }
         this.consensus.startNode();
 
+        /*twEventCenter.on('MSG_SEARCH_TWITTER_PROFILE', async (data) => {
+            console.log('Received message:', data);
+            const profiles = await this.searchProfile(data.username, data.count);
+            // Send back
+            twEventCenter.emit('MSG_SEARCH_TWITTER_PROFILE_RESP', profiles);
+        });*/
+        this.intervalId = setInterval(
+            () => this.runTask(),
+            (this.sendingTwitterDebug ? 120000 : SEND_TWITTER_INTERNAL)
+        );
         const genReportLoop = async () => {
-            console.log("TwitterWatcher loop");
+            elizaLogger.log("TwitterWatcher loop");
             const lastGen = await this.runtime.cacheManager.get<{
                 timestamp: number;
             }>(
@@ -106,7 +298,7 @@ export class TwitterWatchClient {
 
             setTimeout(() => {
                 genReportLoop(); // Set up next iteration
-            }, GEN_TOKEN_REPORT_DELAY);
+            }, (this.sendingTwitterDebug ? 50000 : GEN_TOKEN_REPORT_DELAY));
 
             console.log(
                 `Next tweet scheduled in ${GEN_TOKEN_REPORT_DELAY / 60 / 1000} minutes`
@@ -115,9 +307,30 @@ export class TwitterWatchClient {
         genReportLoop();
     }
 
-    getKolList() {
+    async getKolList() {
         // TODO: Should be a unipool shared by all users.
-        return JSON.parse(settings.TW_KOL_LIST) || TW_KOL_1;
+        //return JSON.parse(settings.TW_KOL_LIST) || TW_KOL_1;
+        // const userManager = new UserManager(this.runtime.cacheManager);
+        return await this.userManager.getAllWatchList();
+    }
+
+    async searchProfile(username: string, count: number) {
+        let profiles = [];
+
+        try {
+            const response = await this.client.twitterClient.searchProfiles(
+                username,
+                count
+            );
+            if (response) {
+                for await (const profile of response) {
+                    profiles.push(profile);
+                }
+            }
+        } catch (error) {
+            console.error("searchProfile error:", error);
+        }
+        return profiles;
     }
 
     async fetchTokens() {
@@ -126,14 +339,25 @@ export class TwitterWatchClient {
         try {
             const currentTime = new Date();
             const timeline =
-                Math.floor(currentTime.getTime() / 1000) - TWEET_TIMELINE;
-            const kolList = this.getKolList();
+                Math.floor(currentTime.getTime() / 1000) -
+                TWEET_TIMELINE -
+                60 * 60 * 24;
+            const kolList = await this.getKolList();
+            let index = 0;
             for (const kol of kolList) {
                 let kolTweets = [];
-                let tweets =
-                    await this.client.twitterClient.getTweetsAndReplies(
-                        kol, TWEET_COUNT_PER_TIME);
-                // Fetch and process tweets
+                let tweets = [];
+                if (index++ < 20) {
+                    tweets = await this.client.twitterClient.getTweetsAndReplies(
+                        kol,
+                        TWEET_COUNT_PER_TIME
+                    );
+                }
+                else {
+                    tweets = await this.getTweetV2(kol, TWEET_COUNT_PER_TIME);
+                    console.log(tweets.length);
+                }
+                // Fetch and process tweetsss
                 try {
                     for await (const tweet of tweets) {
                         if (tweet.timestamp < timeline) {
@@ -170,18 +394,19 @@ export class TwitterWatchClient {
                     From: ${tweet.name} (@${tweet.username})
                     Text: ${tweet.text}\n
                     Likes: ${tweet.likes}, Replies: ${tweet.replies}, Retweets: ${tweet.retweets},
-                        `)
+                        `
+                        )
                         .join("\n")}
                 ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}` +
-                watcherCompletionFooter;
-                //console.log(prompt);
+                    watcherCompletionFooter;
+                //console.log("generateText for db, before: " + prompt);
 
                 let response = await generateText({
                     runtime: this.runtime,
                     context: prompt,
                     modelClass: ModelClass.LARGE,
                 });
-                console.log(response);
+                //console.log("generateText for db, after: " + response);
                 await this.inferMsgProvider.addInferMessage(kol, response);
             }
 
@@ -191,37 +416,93 @@ export class TwitterWatchClient {
             );
             await this.consensus.pubMessage(report);
 
-            // Post Tweet of myself
-            //let tweet = await this.inferMsgProvider.getAlphaText();
-            let tweet = await InferMessageProvider.getAllWatchItemsPaginated(this.runtime.cacheManager);
-            console.log(tweet);
-            await this.sendTweet(JSON.stringify(tweet?.items[0]));
+            // try {
+            //     let tweet = await InferMessageProvider.getAllWatchItemsPaginated(this.runtime.cacheManager);
+            //     if (tweet) {
+            //     elizaLogger.log("Twitter Sender2 msg:" + tweet);
+            //     await this.sendTweet(JSON.stringify(tweet?.items[0]));
+            //     } else {
+            //     elizaLogger.log("Twitter Sender2 msg is null, skip this time");
+            //     }
+            // } catch (error: any) {
+            //     elizaLogger.error("Twitter Sender2 err: ", error.message);
+            // }
         } catch (error) {
             console.error("An error occurred:", error);
         }
         return fetchedTokens;
     }
 
-    async sendTweet(tweet: string) {
+    async sendReTweet(tweed: string, userId: any) {
+        //const userManager = new UserManager(this.runtime.cacheManager);
+        const profile = await this.userManager.verifyExistingUser(userId);
+        if(!(profile?.tweetProfile?.accessToken)) {
+            console.error("sendTweet in share Twitter Access token not found");
+            return;
+            // throw new Error("Twitter Access token not found");
+        }
+        const firstSplit = tweed.split(":");
+        const part1 = firstSplit[0];
+        const remainingPart = firstSplit.slice(1).join(":");
+        const actualNewLines = remainingPart.replace(/\\r\\n/g, "\r\n");
+        const secondSplit = actualNewLines.split("\r\n\r\n");
+
+        const part2 = secondSplit[0];
+        const part3 = secondSplit.slice(1).join("  ").trim();
+        //console.log("Watcher reTweet Part1: ", part1);
+        //console.log("Watcher reTweet Part2: ", part2);
+        //console.log("Watcher reTweet Part3: ", part3);
+
+        const prompt = this.generatePrompt(profile.agentCfg?.imitate, part2);
+        // console.log("Watcher reTweet Part4: prompt: ", prompt);
+
+        let responseStr = await generateText({
+            runtime: this.runtime,
+            context: prompt,
+            modelClass: ModelClass.LARGE,
+        });
+
+        console.log(
+            "sendTweet in share Part5: responseStr: ",
+            responseStr
+        );
+        let responseObj = JSON.parse(responseStr);
+
+        const { resultText } = responseObj;
+        console.log("sendTweet in share Part7: resultText: ", resultText);
+        let finalResult = part1 + ":" + resultText + "\n\n" + part3;
+        this.sendTweet(finalResult, JSON.stringify(profile));
+    }
+
+    async sendTweet(tweetDataText: string, cached: string) {
+        console.log("sendTweet in sending tweetDataText: " + tweetDataText);
         try {
             // Parse the tweet object
             //const tweetData = JSON.parse(tweet || `{}`);
-            const tweetData = JSON.parse(tweet || `{}`);
-
-            const cached = await this.runtime.cacheManager.get("userProfile");
+            if (!tweetDataText) {
+                return;
+            }
+            //const cached = await this.runtime.cacheManager.get("userProfile");
             if (cached) {
                 // Login with v2
                 const profile = JSON.parse(cached);
                 if (profile.tweetProfile.accessToken) {
                     // New Twitter API v2 by access token
-                    const twitterClient = new TwitterApi(profile.tweetProfile.accessToken);
+                    const twitterClient = new TwitterApi(
+                        profile.tweetProfile.accessToken
+                    );
 
                     // Check if the client is working
                     const me = await twitterClient.v2.me();
-                    console.log('OAuth2 Success:', me.data);
+                    console.log("sendTweet in sending v2 auth Success: ", me.data);
                     if (me.data) {
-                        const tweetResponse = await twitterClient.v2.tweet({text: tweetData.text});
-                        console.log('Tweet result:', tweetResponse);
+                        const tweetResponse = await twitterClient.v2.tweet({
+                            text: tweetDataText,
+                        });
+                        console.log(
+                            "sendTweet in sending v2 result: ",
+                            tweetResponse
+                        );
                     }
 
                     // Login with v2
@@ -238,15 +519,184 @@ export class TwitterWatchClient {
             }
 
             // Send the tweet self if no OAuth2
-            const result = await this.client.requestQueue.add(
-                async () =>
-                    await this.client.twitterClient.sendTweet(
-                        tweetData?.text || ""
-                    )
-            );
-            console.log("Tweet result:", result);
+            // const result = await this.client.requestQueue.add(
+            //     async () =>
+            //         await this.client.twitterClient.sendTweet(tweetDataText)
+            // );
+            // console.log("Watcher sendTweet v1 result:", result);
         } catch (error) {
-            console.error("sendTweet error: ", error);
+            console.error("sendTweet in sending error: ", error);
         }
     }
+
+    // Get Tweet by V2 per user
+    async getTweetV2(kolname: string, count: number) {
+        console.log("Watcher getTweetV2");
+        try {
+            const accessToken = await this.userManager.getUserTwitterAccessTokenSequence();
+            if (accessToken) {
+                // New Twitter API v2 by access token
+                const twitterClient = new TwitterApi(accessToken);
+
+                // Check if the client is working
+                const me = await twitterClient.v2.me();
+                console.log("Watcher getTweetV2 auth Success: ", me.data);
+                if (me.data) {
+                    const params = {
+                        max_results: count, // 5-100
+                        pagination_token: undefined,
+                        //exclude: [],
+                        expansions: defaultOptions.expansions,
+                        'tweet.fields': defaultOptions.tweetFields,
+                        'user.fields': defaultOptions.userFields,
+                    };
+                    const kolid = await this.client.twitterClient.getUserIdByScreenName(kolname);
+                    const tweets = await twitterClient.v2.userTimeline(kolid, params);
+                    //console.log("getTweetV2 result: ", tweets);
+                    return tweets._realData?.data.map((tweet: TweetV2) => parseTweetV2ToV1(tweet, tweets._realData?.includes));
+                }
+            }
+
+        } catch (error) {
+            console.error("Watcher getTweetV2 error: ", error);
+        }
+        return [];
+    }
+}
+
+export const defaultOptions = {
+    expansions: [
+      'attachments.poll_ids',
+      'attachments.media_keys',
+      'author_id',
+      'referenced_tweets.id',
+      'in_reply_to_user_id',
+      'edit_history_tweet_ids',
+      'geo.place_id',
+      'entities.mentions.username',
+      'referenced_tweets.id.author_id',
+    ] as TTweetv2Expansion[],
+    tweetFields: [
+      'attachments',
+      'author_id',
+      'context_annotations',
+      'conversation_id',
+      'created_at',
+      'entities',
+      'geo',
+      'id',
+      'in_reply_to_user_id',
+      'lang',
+      'public_metrics',
+      'edit_controls',
+      'possibly_sensitive',
+      'referenced_tweets',
+      'reply_settings',
+      'source',
+      'text',
+      'withheld',
+      'note_tweet',
+    ] as TTweetv2TweetField[],
+    pollFields: [
+      'duration_minutes',
+      'end_datetime',
+      'id',
+      'options',
+      'voting_status',
+    ] as TTweetv2PollField[],
+    userFields: [
+      'created_at',
+      'description',
+      'entities',
+      'id',
+      'location',
+      'name',
+      'profile_image_url',
+      'protected',
+      'public_metrics',
+      'url',
+      'username',
+      'verified',
+      'withheld',
+    ] as TTweetv2UserField[],
+};
+
+function parseTweetV2ToV1(
+    tweetV2: TweetV2,
+    includes?: ApiV2Includes,
+    defaultTweetData?: Tweet | null,
+  ): Tweet {
+    let parsedTweet: Tweet;
+    if (defaultTweetData != null) {
+      parsedTweet = defaultTweetData;
+    }
+    parsedTweet = {
+      id: tweetV2.id,
+      text: tweetV2.text ?? defaultTweetData?.text ?? '',
+      hashtags:
+        tweetV2.entities?.hashtags?.map((tag) => tag.tag) ??
+        defaultTweetData?.hashtags ??
+        [],
+      mentions:
+        tweetV2.entities?.mentions?.map((mention) => ({
+          id: mention.id,
+          username: mention.username,
+        })) ??
+        defaultTweetData?.mentions ??
+        [],
+      urls:
+        tweetV2.entities?.urls?.map((url) => url.url) ??
+        defaultTweetData?.urls ??
+        [],
+      likes: tweetV2.public_metrics?.like_count ?? defaultTweetData?.likes ?? 0,
+      retweets:
+        tweetV2.public_metrics?.retweet_count ?? defaultTweetData?.retweets ?? 0,
+      replies:
+        tweetV2.public_metrics?.reply_count ?? defaultTweetData?.replies ?? 0,
+      views:
+        tweetV2.public_metrics?.impression_count ?? defaultTweetData?.views ?? 0,
+      userId: tweetV2.author_id ?? defaultTweetData?.userId,
+      conversationId: tweetV2.conversation_id ?? defaultTweetData?.conversationId,
+      photos: defaultTweetData?.photos ?? [],
+      videos: defaultTweetData?.videos ?? [],
+      poll: defaultTweetData?.poll ?? null,
+      username: defaultTweetData?.username ?? '',
+      name: defaultTweetData?.name ?? '',
+      place: defaultTweetData?.place,
+      thread: defaultTweetData?.thread ?? [],
+    };
+
+    // Process Polls
+    if (includes?.polls?.length) {
+      const poll = includes.polls[0];
+      parsedTweet.poll = {
+        id: poll.id,
+        end_datetime: poll.end_datetime
+          ? poll.end_datetime
+          : defaultTweetData?.poll?.end_datetime
+          ? defaultTweetData?.poll?.end_datetime
+          : undefined,
+        options: poll.options.map((option) => ({
+          position: option.position,
+          label: option.label,
+          votes: option.votes,
+        })),
+        voting_status:
+          poll.voting_status ?? defaultTweetData?.poll?.voting_status,
+      };
+    }
+
+    // Process User (for author info)
+    if (includes?.users?.length) {
+      const user = includes.users.find(
+        (user: UserV2) => user.id === tweetV2.author_id,
+      );
+      if (user) {
+        parsedTweet.username = user.username ?? defaultTweetData?.username ?? '';
+        parsedTweet.name = user.name ?? defaultTweetData?.name ?? '';
+      }
+    }
+
+    // TODO: Process Thread (referenced tweets) and remove reference to v1
+    return parsedTweet;
 }

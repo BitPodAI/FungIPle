@@ -31,6 +31,7 @@ import { AgentConfig } from "../../../agent/src/index";
 import * as fs from "fs";
 import * as path from "path";
 import { Routes } from "./routes.ts";
+import { exceptionHandler, parseToken } from "./auth.ts";
 const upload = multer({ storage: multer.memoryStorage() });
 
 export const messageHandlerTemplate =
@@ -86,7 +87,9 @@ export class DirectClient {
     constructor() {
         elizaLogger.log("DirectClient constructor");
         this.app = express();
+        this.app.use(exceptionHandler);
         this.app.use(cors());
+        this.app.use(parseToken);
         this.agents = new Map();
 
         this.app.use(bodyParser.json());
@@ -94,6 +97,13 @@ export class DirectClient {
 
         const routes = new Routes(this, this.registerCallbackFn);
         routes.setupRoutes(this.app);
+
+        // This is an interface for debugging whether the network is connected or not
+        // host + env.SERVER_PORT + /hello
+        // eg: http://97.64.20.241:3000/hello
+        this.app.get("/hello", (req, res) => {
+            res.json("Hello, Web3 World!");
+        });
 
         // Define an interface that extends the Express Request interface
         interface CustomRequest extends ExpressRequest {
@@ -429,9 +439,10 @@ export class DirectClient {
 
                 if (req.body.request == "latest_report") {
                     try {
-                        let report = await InferMessageProvider.getLatestReport(
-                            runtime.cacheManager
-                        );
+                        const report =
+                            await InferMessageProvider.getLatestReport(
+                                runtime.cacheManager
+                            );
                         res.json(report);
                     } catch (error) {
                         console.error("Error fetching token data: ", error);
@@ -457,7 +468,7 @@ export class DirectClient {
                     res.json(report);
                 } else if (req.body.request == "watch_text") {
                     try {
-                        let report = await InferMessageProvider.getReportText(
+                        const report = await InferMessageProvider.getReportText(
                             runtime.cacheManager
                         );
                         res.json(report);
@@ -474,7 +485,7 @@ export class DirectClient {
                     res.json(TW_KOL_1);
                 } else if (req.body.request == "quotes_text") {
                     const len = QUOTES_LIST.length - 1;
-                    let index = Math.floor(Math.random() * len);
+                    const index = Math.floor(Math.random() * len);
                     res.json(QUOTES_LIST[index]);
                 } else if (req.body.request == "token_chat") {
                     try {
