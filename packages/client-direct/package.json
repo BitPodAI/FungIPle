@@ -10,6 +10,7 @@
         "@ai16z/plugin-data-enrich": "workspace:*",
         "@ai16z/client-twitter": "workspace:*",
         "@types/body-parser": "1.19.5",
+        "@privy-io/server-auth":"1.18.1",
         "@types/cors": "2.8.17",
         "@types/express": "5.0.0",
         "body-parser": "1.20.3",

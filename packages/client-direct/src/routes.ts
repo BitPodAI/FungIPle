@@ -26,6 +26,8 @@ import { InvalidPublicKeyError } from "./solana";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTokenTransferTransaction } from "./solana";
+import { MemoController } from "./memo";
+import { requireAuth } from "./auth";
 //import { requireAuth } from "./auth";
 
 interface TwitterCredentials {
@@ -202,7 +204,10 @@ export class Routes {
             this.handleTwitterProfileSearch.bind(this)
         );
         app.post("/:agentId/re_twitter", this.handleReTwitter.bind(this));
-        app.post("/:agentId/translate_text", this.handleTranslateText.bind(this));
+        app.post(
+            "/:agentId/translate_text",
+            this.handleTranslateText.bind(this)
+        );
         app.post("/:agentId/profile_upd", this.handleProfileUpdate.bind(this));
         app.post(
             "/:agentId/profile",
@@ -213,6 +218,24 @@ export class Routes {
         app.get("/:agentId/config", this.handleConfigQuery.bind(this));
         app.post("/:agentId/watch", this.handleWatchText.bind(this));
         app.post("/:agentId/chat", this.handleChat.bind(this));
+        const memoController = new MemoController(this.client);
+        console.log("memo controller-----");
+        app.get(
+            "/:agentId/memo",
+            requireAuth,
+            memoController.handleGetMemoList.bind(memoController)
+        );
+        app.post(
+            "/:agentId/memo",
+            requireAuth,
+            memoController.handleAddMemo.bind(memoController)
+        );
+        app.delete(
+            "/:agentId/memo",
+            requireAuth,
+            memoController.handleDeleteMomo.bind(memoController)
+        );
+
         //app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
         //app.post("/:agentId/solkit_transfer",
         //    this.handleSolAgentKitTransfer.bind(this));
@@ -582,7 +605,7 @@ export class Routes {
                     const usernameSet = new Set<string>();
                     if (alreadyWatchedList) {
                         for (const item of alreadyWatchedList) {
-                            let profile = {
+                            const profile = {
                                 isWatched: true,
                                 username: item?.username,
                                 name: item?.name,
@@ -665,21 +688,23 @@ export class Routes {
             console.log("handleTranslateText 2" + text);
 
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
-            const prompt = "You are a helpful translator. If the following text is in English, please translate it into Chinese. If it is in another language, translate it into English; The returned result only includes the translated result,The JSON structure of the returned result is: {\"result\":\"\"}. The text that needs to be translated starts with [Text]. [TEXT]: " + text;
+            const prompt =
+                'You are a helpful translator. If the following text is in English, please translate it into Chinese. If it is in another language, translate it into English; The returned result only includes the translated result,The JSON structure of the returned result is: {"result":""}. The text that needs to be translated starts with [Text]. [TEXT]: ' +
+                text;
             //console.log("handleTranslateText 3" + prompt);
 
-            let response = await generateText({
-                    runtime: runtime,
-                    context: prompt,
-                    modelClass: ModelClass.SMALL,
-                });
+            const response = await generateText({
+                runtime: runtime,
+                context: prompt,
+                modelClass: ModelClass.SMALL,
+            });
             //console.log("handleTranslateText 4" + response);
 
             if (!response) {
                 throw new Error("No response from generateText");
             }
             // response struct: {"result":""}
-            let responseObj = JSON.parse(response);
+            const responseObj = JSON.parse(response);
             return res.json({
                 success: true,
                 data: responseObj,
@@ -1051,7 +1076,7 @@ export class Routes {
     }*/
 
     async handleGrowthExperience(exp: number, profile: any, reason: string) {
-        if(!profile) {
+        if (!profile) {
             return;
         }
         console.log(
