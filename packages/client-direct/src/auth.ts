@@ -25,8 +25,9 @@ export async function verifyPrivyToken(token: string) {
  * @param next
  */
 export const parseToken = async (req, res, next) => {
-    const token = req.headers.authorization;
-    if (token) {
+    const tokenHeader = req.headers.authorization?.split(" ");
+    if (tokenHeader && tokenHeader.length > 1 && tokenHeader[0] === "Bearer") {
+        const token = tokenHeader[1];
         res.locals.user = await verifyPrivyToken(token);
     }
     next();
