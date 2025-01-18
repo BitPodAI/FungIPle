@@ -74,6 +74,7 @@ interface UserManageInterface {
 
 export class UserManager implements UserManageInterface {
     static ALL_USER_IDS: string = "USER_PROFILE_ALL_IDS_";
+    static USER_ID_SEQUENCE: string = "USER_PROFILE_ID_SEQUENCE_";
     idSet = new Set();
 
     constructor(private cacheManager: ICacheManager) {}
@@ -249,5 +250,67 @@ export class UserManager implements UserManageInterface {
         } else {
             return false;
         }
+    }
+
+    async getUserTwitterAccessTokenSequence(): Promise<string> {
+        // Get all user IDs
+        let userId = "";
+        let accessToken = "";
+        try {
+            const idsStr = (await this.getCachedData(
+                UserManager.ALL_USER_IDS
+            )) as string;
+            if (!idsStr) {
+                return accessToken;
+            }
+    
+            let idSeq = (await this.getCachedData<number>(
+                UserManager.USER_ID_SEQUENCE
+            ));
+            if (!idSeq) {
+                idSeq = 0;
+            }
+    
+            // Parse IDs array
+            const ids = new Set(JSON.parse(idsStr));
+            const idArray = Array.from(ids);
+            if (idArray.length > 0) {
+                if (idSeq >= idArray.length) {
+                    idSeq = 0;
+                }
+                userId = idArray[idSeq] as string;
+                let profile = await this.getUserProfile(userId);
+                if (profile && profile.tweetProfile) {
+                    accessToken = profile.tweetProfile.accessToken;
+                }
+                else {
+                    accessToken = "";
+                }
+                let index = 0;
+                while (!profile || !accessToken) {
+                    idSeq++;
+                    if (idSeq >= idArray.length) {
+                        idSeq = 0;
+                    }
+                    userId = idArray[idSeq] as string;
+                    profile = await this.getUserProfile(userId);
+                    if (profile && profile.tweetProfile) {
+                        accessToken = profile.tweetProfile.accessToken;
+                    }
+                    else {
+                        accessToken = "";
+                    }
+                    if (index++ > idArray.length) {
+                        return accessToken;
+                    }
+                }
+                idSeq ++;
+                await this.setCachedData(UserManager.USER_ID_SEQUENCE, idSeq);
+            }
+        }
+        catch (error) {
+            console.error(error);
+        }
+        return accessToken;
     }
 }
