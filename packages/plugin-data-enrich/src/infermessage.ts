@@ -113,10 +113,11 @@ export class InferMessageProvider {
                         kol: kol,
                         token: item.token,
                         title: `${item.interact}, total ${item.count} times`,
-                        updatedAt: new Date()
-                            .toISOString()
-                            .slice(0, 16)
-                            .replace(/T/g, " "),
+                        //updatedAt: new Date()
+                        //    .toISOString()
+                        //    .slice(0, 16)
+                        //    .replace(/T/g, " "),
+                        updatedAt: Date.now().toString(),
                         text: `${item.token}: ${item.event}\r\n\r\n ${tokenInfo}`,
                     };
                     kolItems.push(alpha);
