@@ -948,7 +948,7 @@ export class Routes {
             try {
                 const { cursor, watchlist } = req.body;
                 let report;
-                if (watchlist) {
+                if (watchlist && watchlist.length > 0) {
                     report =
                         await InferMessageProvider.getWatchItemsPaginatedForKols(
                             runtime.cacheManager,
