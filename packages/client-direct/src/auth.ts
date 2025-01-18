@@ -2,10 +2,7 @@ import { PrivyClient } from "@privy-io/server-auth";
 import { RequestHandler } from "express";
 import { settings } from "@ai16z/eliza";
 
-const privy = new PrivyClient(
-    settings.PRIVY_APP_ID,
-    settings.PRIVY_APP_SECRET
-);
+const privy = new PrivyClient(settings.PRIVY_APP_ID, settings.PRIVY_APP_SECRET);
 
 /**
  * Verify privy token
@@ -59,9 +56,9 @@ export const requireAuth: RequestHandler = (req, res, next) => {
 export const exceptionHandler = async (req, res, next) => {
     try {
         next();
-    }
-    catch (error) {
+    } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Internal system error." });
+        res.end();
     }
 };
