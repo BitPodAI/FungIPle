@@ -839,82 +839,89 @@ export class Routes {
             if (!userId) {
                 throw new ApiError(400, "Missing required field: userId");
             }
+            try {
+                // Get user profile and credentials
+                const { runtime, profile } = await this.authUtils.validateRequest(
+                    req.params.agentId,
+                    userId
+                );
 
-            // Get user profile and credentials
-            const { runtime, profile } = await this.authUtils.validateRequest(
-                req.params.agentId,
-                userId
-            );
+                const {
+                    name = profile.agentname,
+                    roomId: customRoomId,
+                    prompt,
+                } = req.body;
 
-            const {
-                name = profile.agentname,
-                roomId: customRoomId,
-                prompt,
-            } = req.body;
+                // if (!prompt) {
+                //     throw new ApiError(400, "Missing required field: prompt");
+                // }
 
-            // if (!prompt) {
-            //     throw new ApiError(400, "Missing required field: prompt");
-            // }
+                const roomId = stringToUuid(
+                    customRoomId ??
+                        `default-room-${profile.userId}-${req.params.agentId}`
+                );
+                const newAgentId = stringToUuid(userId);
 
-            const roomId = stringToUuid(
-                customRoomId ??
-                    `default-room-${profile.userId}-${req.params.agentId}`
-            );
-            const newAgentId = stringToUuid(userId);
+                // Create agent config from user credentials
+                const agentConfig: AgentConfig = {
+                    ...profile,
+                    prompt,
+                    clients: ["twitter"],
+                    modelProvider: "redpill",
+                    bio: Array.isArray(profile.bio)
+                        ? profile.bio
+                        : [profile.bio || `I am ${name}`],
+                    style: profile.style || {
+                        all: [],
+                        chat: [],
+                        post: [],
+                    },
+                    adjectives: profile.adjectives || [],
+                    lore: profile.lore || [],
+                    knowledge: profile.knowledge || [],
+                    topics: profile.topics || [],
+                };
 
-            // Create agent config from user credentials
-            const agentConfig: AgentConfig = {
-                ...profile,
-                prompt,
-                clients: ["twitter"],
-                modelProvider: "redpill",
-                bio: Array.isArray(profile.bio)
-                    ? profile.bio
-                    : [profile.bio || `I am ${name}`],
-                style: profile.style || {
-                    all: [],
-                    chat: [],
-                    post: [],
-                },
-                adjectives: profile.adjectives || [],
-                lore: profile.lore || [],
-                knowledge: profile.knowledge || [],
-                topics: profile.topics || [],
-            };
+                // Ensure connection
+                await runtime.ensureConnection(
+                    userId,
+                    roomId,
+                    profile.userId,
+                    name,
+                    "direct"
+                );
 
-            // Ensure connection
-            await runtime.ensureConnection(
-                userId,
-                roomId,
-                profile.userId,
-                name,
-                "direct"
-            );
+                // Create memory
+                const messageId = stringToUuid(Date.now().toString());
+                const memory: Memory = {
+                    id: messageId,
+                    agentId: runtime.agentId,
+                    userId,
+                    roomId,
+                    content: {
+                        text: prompt,
+                        attachments: [],
+                        source: "direct",
+                        inReplyTo: undefined,
+                    },
+                    createdAt: Date.now(),
+                };
 
-            // Create memory
-            const messageId = stringToUuid(Date.now().toString());
-            const memory: Memory = {
-                id: messageId,
-                agentId: runtime.agentId,
-                userId,
-                roomId,
-                content: {
-                    text: prompt,
-                    attachments: [],
-                    source: "direct",
-                    inReplyTo: undefined,
-                },
-                createdAt: Date.now(),
-            };
+                await runtime.messageManager.createMemory(memory);
 
-            await runtime.messageManager.createMemory(memory);
+                // Register callback if provided
+                //if (this.client.registerCallbackFn) {
+                //    await this.client.registerCallbackFn(agentConfig, memory);
+                //}
 
-            // Register callback if provided
-            if (this.client.registerCallbackFn) {
-                await this.client.registerCallbackFn(agentConfig, memory);
+                return { profile, agentId: newAgentId };
+            } catch (error) {
+                console.error("Profile query error:", error);
+                return res.status(500).json({
+                    success: false,
+                    error: "Internal server error",
+                });
             }
-
-            return { profile, agentId: newAgentId };
         });
     }
 
