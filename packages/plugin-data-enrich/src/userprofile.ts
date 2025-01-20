@@ -55,6 +55,13 @@ export interface UserProfile {
     topics?: string[];
 }
 
+export interface TwitterScapData {
+    username: string;
+    timestamp: number;
+    tweetsCount: number;
+    followingCount: number;
+}
+
 interface UserManageInterface {
     // Update profile for spec user
     updateProfile(profile: UserProfile);
@@ -75,6 +82,7 @@ interface UserManageInterface {
 export class UserManager implements UserManageInterface {
     static ALL_USER_IDS: string = "USER_PROFILE_ALL_IDS_";
     static USER_ID_SEQUENCE: string = "USER_PROFILE_ID_SEQUENCE_";
+    static TWITTER_SCRAP_DATA: string = "TWITTER_SCRAP_DATA_";
     idSet = new Set();
 
     constructor(private cacheManager: ICacheManager) {}
@@ -113,16 +121,23 @@ export class UserManager implements UserManageInterface {
 
     async getWatchList(userId: string): Promise<WatchItem[]> {
         // let watchList = new Set<string>();
-        // // Get list by userId
-        let userProfile = await this.getCachedData<UserProfile>(
-            userId as string
-        );
-        // if (userProfile?.twitterWatchList) {
-        //     for (const watchItem of userProfile.twitterWatchList) {
-        //         watchList.add(watchItem.username);
-        //     }
-        // }
-        return Array.from(userProfile?.twitterWatchList);
+        try {
+            // // Get list by userId
+            let userProfile = await this.getCachedData<UserProfile>(
+                userId as string
+            );
+            // if (userProfile?.twitterWatchList) {
+            //     for (const watchItem of userProfile.twitterWatchList) {
+            //         watchList.add(watchItem.username);
+            //     }
+            // }
+            if (userProfile?.twitterWatchList) {
+                return Array.from(userProfile?.twitterWatchList);
+            }
+        } catch (error) {
+            console.error(error);
+        }
+        return [];
     }
 
     async getAllWatchList(): Promise<string[]> {
@@ -252,16 +267,20 @@ export class UserManager implements UserManageInterface {
         }
     }
 
-    async getUserTwitterAccessTokenSequence(): Promise<string> {
+    async getUserTwitterAccessTokenSequence(): Promise<{
+        accessToken: string,
+        refreshToken: string
+    }> {
         // Get all user IDs
         let userId = "";
         let accessToken = "";
+        let refreshToken = "";
         try {
             const idsStr = (await this.getCachedData(
                 UserManager.ALL_USER_IDS
             )) as string;
             if (!idsStr) {
-                return accessToken;
+                return { accessToken, refreshToken };
             }
     
             let idSeq = (await this.getCachedData<number>(
@@ -282,12 +301,14 @@ export class UserManager implements UserManageInterface {
                 let profile = await this.getUserProfile(userId);
                 if (profile && profile.tweetProfile) {
                     accessToken = profile.tweetProfile.accessToken;
+                    refreshToken = profile.tweetProfile.refreshToken;
                 }
                 else {
                     accessToken = "";
+                    refreshToken = "";
                 }
                 let index = 0;
-                while (!profile || !accessToken) {
+                while (!profile || !refreshToken) {
                     idSeq++;
                     if (idSeq >= idArray.length) {
                         idSeq = 0;
@@ -296,12 +317,14 @@ export class UserManager implements UserManageInterface {
                     profile = await this.getUserProfile(userId);
                     if (profile && profile.tweetProfile) {
                         accessToken = profile.tweetProfile.accessToken;
+                        refreshToken = profile.tweetProfile.refreshToken;
                     }
                     else {
                         accessToken = "";
+                        refreshToken = "";
                     }
                     if (index++ > idArray.length) {
-                        return accessToken;
+                        return { accessToken, refreshToken };
                     }
                 }
                 idSeq ++;
@@ -311,6 +334,48 @@ export class UserManager implements UserManageInterface {
         catch (error) {
             console.error(error);
         }
-        return accessToken;
+        return { accessToken, refreshToken };
+    }
+
+    async getTwitterScrapData(username: string): Promise<TwitterScapData> {
+        try {
+            const data = await this.getCachedData<TwitterScapData>(
+                UserManager.TWITTER_SCRAP_DATA + username);
+            if (data) {
+                if (data.followingCount == null) {
+                    data.followingCount = 0;
+                }
+                return data;
+            }
+        }
+        catch (error) {
+            console.error(error);
+        }
+        console.log("getTwitterScrapData");
+        return {
+            username,
+            timestamp: 0,
+            tweetsCount: 0,
+            followingCount: 0
+        }
+    }
+
+    async setTwitterScrapData(username: string, timestamp: number,
+        tweetsCount: number, followingCount: number) {
+        try {
+            const data = {
+                username,
+                timestamp,
+                tweetsCount,
+                followingCount
+            };
+            await this.setCachedData(
+                UserManager.TWITTER_SCRAP_DATA + username,
+                data
+            );
+        }
+        catch (error) {
+            console.error(error);
+        }
     }
 }
