@@ -561,8 +561,8 @@ export class Routes {
                 userProfile.tweetProfile.refreshToken = "";
                 await userManager.saveUserData(userProfile);
 
-                const data = await response.json();
-                console.log("Authorization revoked successfully:", data);
+                //const data = await response.json();
+                //console.log("Authorization revoked successfully:", data);
             } catch (err) {
                 console.error("Twitter auth revoke error:", err);
             }
