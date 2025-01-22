@@ -365,18 +365,16 @@ export class TwitterWatchClient {
                 const { timestamp, tweetsCount, followingCount, followingList } = await this.userManager.getTwitterScrapData(kol);
                 const twProfile = await this.client.twitterClient.getProfile(kol);
                 let newFollowingList: string[] = [];
-                if (followingCount != 0 && followingCount < twProfile.followingCount && followingList.length > 0) {
+                if (followingCount != 0 && followingCount < twProfile.followingCount) {
                     //TODO: the delete of the followings
                     // Get the change of followingCount
                     const followings = await this.client.twitterClient.fetchProfileFollowing(twProfile.userId, 10);
-                    //console.log(followingCount);
-                    //console.log(followings.profiles.length);
                     newFollowingList = followings.profiles.map(item => item.username);
-                    //console.log(newFollowingList);
-                    await this.setFollowingChanged(kol, newFollowingList, followingList)
+                    if (followingList.length > 0) {
+                        await this.setFollowingChanged(kol, newFollowingList, followingList);
+                    }
                     await this.userManager.setTwitterScrapData(kol, timestamp,
                         twProfile.tweetsCount, twProfile.followingCount, newFollowingList);
-                    
                 }
                 console.log(timestamp);
                 if (tweetsCount == twProfile.tweetsCount) {
