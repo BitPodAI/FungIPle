@@ -334,6 +334,22 @@ export class TwitterWatchClient {
         return profiles;
     }
 
+    // get the following list
+    async setFollowingChanged(username: string,
+        followingList: string[], preFollowingList: string[]) {
+        const changedList = followingList.filter(item => !preFollowingList.includes(item));
+        //console.log(changedList);
+        if (changedList && changedList.length > 0) {
+            //await this.inferMsgProvider.addFollowingChangeMessage(kol,
+            //    ` for changing about ${twProfile.followingCount - followingCount} new followings, please check.`)
+            const output = `[@${changedList.map(item => item).join('], [@')}]`;
+            console.log(output);
+            await this.inferMsgProvider.addFollowingChangeMessage(username,
+                ` for changing ${changedList.length} new followings of ${output}.`);
+        }
+
+    }
+
     async fetchTokens() {
         let fetchedTokens = new Map();
 
@@ -346,15 +362,21 @@ export class TwitterWatchClient {
             const kolList = await this.getKolList();
             let index = 0;
             for (const kol of kolList) {
-                const { timestamp, tweetsCount, followingCount } = await this.userManager.getTwitterScrapData(kol);
+                const { timestamp, tweetsCount, followingCount, followingList } = await this.userManager.getTwitterScrapData(kol);
                 const twProfile = await this.client.twitterClient.getProfile(kol);
-                if (followingCount != 0 && followingCount != twProfile.followingCount) {
+                let newFollowingList: string[] = [];
+                if (followingCount != 0 && followingCount < twProfile.followingCount) {
+                    //TODO: the delete of the followings
                     // Get the change of followingCount
-                    console.log(followingCount);
-                    //let followings = await this.client.twitterClient.fetchProfileFollowing(twProfile.userId, 1);
-                    //console.log(followings);
-                    //await this.inferMsgProvider.addFollowingChangeMessage(kol,
-                    //    ` for changing about ${twProfile.followingCount - followingCount} new followings, please check.`)
+                    const followings = await this.client.twitterClient.fetchProfileFollowing(twProfile.userId, 10);
+                    //console.log(followingCount);
+                    //console.log(followings.profiles.length);
+                    newFollowingList = followings.profiles.map(item => item.username);
+                    //console.log(newFollowingList);
+                    await this.setFollowingChanged(kol, newFollowingList, followingList)
+                    await this.userManager.setTwitterScrapData(kol, timestamp,
+                        twProfile.tweetsCount, twProfile.followingCount, newFollowingList);
+                    
                 }
                 console.log(timestamp);
                 if (tweetsCount == twProfile.tweetsCount) {
@@ -393,7 +415,7 @@ export class TwitterWatchClient {
                 }
                 console.log(kolTweets.length);
                 await this.userManager.setTwitterScrapData(kol, latestTimestamp,
-                    twProfile.tweetsCount, twProfile.followingCount);
+                    twProfile.tweetsCount, twProfile.followingCount, newFollowingList);
                 if (kolTweets.length < 1) {
                     continue;
                 }

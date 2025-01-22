@@ -107,7 +107,7 @@ export class InferMessageProvider {
                         TokenAlphaReport.push(item);
                     }
 
-                    let tokenInfo = await this.enrichByWebSearch(item.token);
+                    let tokenInfo = "";//await this.enrichByWebSearch(item.token);
 
                     let alpha: WatchItem = {
                         kol: kol,
@@ -187,8 +187,9 @@ export class InferMessageProvider {
             });
 
             if (!response.ok) {
-                console.log(response);
-                throw new Error(`HTTP error! status: ${response}`);
+                //console.log(response);
+                //throw new Error(`HTTP error! status: ${response}`);
+                return "";
             }
 
             const data = await response.json();

@@ -60,6 +60,7 @@ export interface TwitterScapData {
     timestamp: number;
     tweetsCount: number;
     followingCount: number;
+    followingList: string[];
 }
 
 interface UserManageInterface {
@@ -345,6 +346,9 @@ export class UserManager implements UserManageInterface {
                 if (data.followingCount == null) {
                     data.followingCount = 0;
                 }
+                if (data.followingList == null) {
+                    data.followingList = [];
+                }
                 return data;
             }
         }
@@ -356,18 +360,20 @@ export class UserManager implements UserManageInterface {
             username,
             timestamp: 0,
             tweetsCount: 0,
-            followingCount: 0
+            followingCount: 0,
+            followingList: []
         }
     }
 
     async setTwitterScrapData(username: string, timestamp: number,
-        tweetsCount: number, followingCount: number) {
+        tweetsCount: number, followingCount: number, followingList: string[]) {
         try {
             const data = {
                 username,
                 timestamp,
                 tweetsCount,
-                followingCount
+                followingCount,
+                followingList
             };
             await this.setCachedData(
                 UserManager.TWITTER_SCRAP_DATA + username,
