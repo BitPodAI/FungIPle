@@ -654,10 +654,11 @@ export class Routes {
                 return profilesForDB;
             } catch (error) {
                 console.error("Profile search error:", error);
-                return res.status(500).json({
-                    success: false,
-                    error: "User search error",
-                });
+                //return res.status(500).json({
+                //    success: false,
+                //    error: "User search error",
+                //});
+                return [];
             }
         });
     }
@@ -916,7 +917,7 @@ export class Routes {
 
                 return { profile, agentId: newAgentId };
             } catch (error) {
-                console.error("Profile query error:", error);
+                console.error("Create Agent error:", error);
                 return res.status(500).json({
                     success: false,
                     error: "Internal server error",
