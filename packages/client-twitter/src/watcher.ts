@@ -342,7 +342,7 @@ export class TwitterWatchClient {
         if (changedList && changedList.length > 0) {
             //await this.inferMsgProvider.addFollowingChangeMessage(kol,
             //    ` for changing about ${twProfile.followingCount - followingCount} new followings, please check.`)
-            const output = `[@${changedList.map(item => `@${item}`).join(', ')}]`;
+            const output = `[${changedList.map(item => `@${item}`).join(', ')}]`;
             console.log(output);
             await this.inferMsgProvider.addFollowingChangeMessage(username,
                 ` for changing ${changedList.length} new followings of ${output}.`);
