@@ -28,6 +28,7 @@ import { sendAndConfirmTransaction } from "@solana/web3.js";
 import { createTokenTransferTransaction } from "./solana";
 import { MemoController } from "./memo";
 import { requireAuth } from "./auth";
+//import { ethers } from 'ethers';
 //import { requireAuth } from "./auth";
 
 interface TwitterCredentials {
@@ -235,6 +236,7 @@ export class Routes {
             requireAuth,
             memoController.handleDeleteMomo.bind(memoController)
         );
+        app.post("/:agentId/gain_rewards", this.handleGainRewards.bind(this));
 
         //app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
         //app.post("/:agentId/solkit_transfer",
@@ -1011,6 +1013,87 @@ export class Routes {
                 return { response: "Response with error" };
             }
         });
+    }
+
+    async handleGainRewards(req: express.Request, res: express.Response) {
+        try {
+            console.log("handleGainRewards 0");
+            const { typestr, userId } = req.body;
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const userManager = new UserManager(runtime.cacheManager);
+            const profile = await userManager.verifyExistingUser(userId);
+                    const address = profile.walletAddress;// "0xdD1Be812e7ACe045C67167503157a9FC88D6E403"; //profile.walletAddress;
+                    if (!address) {
+                        throw new ApiError(400, "Missing required field: walletAddress");
+                    }
+                    const tokenAmount = 0.005; // tokenAmount Backend control
+            switch (typestr) {
+                case "sol":
+                    // Handle sol transfer
+                    return res.json({
+                        success: true,
+                        data: "sol reward processed",
+                    });
+                case "eth":
+                    // Handle eth transfer
+                    return res.json({
+                        success: true,
+                        data: "eth reward processed",
+                    });
+                case "base":
+                    // Handle base transfer
+                    console.log("handleGainRewards 1");
+                    // Connect to Ethereum node
+                    /** const provider = new ethers.JsonRpcProvider('https://rpc.sepolia.dev');
+                    // Set wallet's private key //
+                    const privateKey = 'e9705f404a61aafbdb094e80a3e446e36be1ebdd9f43b35b676a0b808320dcf8'; // Ensure this is stored securely
+                    const wallet = new ethers.Wallet(privateKey, provider);
+                    // Set transaction parameters
+                    const toAddress = address; // Use the provided wallet address
+                    const amountInEther = ethers.utils.formatEther(tokenAmount); // Convert tokenAmount to Ether
+                    console.log("handleGainRewards 5");
+
+                    async function sendTransaction() {
+                        const tx = {
+                            to: toAddress,
+                            value: ethers.utils.parseEther(amountInEther), // Convert ETH amount to wei
+                            gasLimit: 21000, // Default gas limit
+                            gasPrice: await provider.getGasPrice(), // Get current gas price
+                        };
+                        console.log("handleGainRewards 6");
+
+                        try {
+                            const transactionResponse = await wallet.sendTransaction(tx);
+                            console.log(`handleGainRewards 61 sent: ${transactionResponse.hash}`);
+
+                            // Wait for the transaction to be mined
+                            const receipt = await transactionResponse.wait();
+                            console.log(`handleGainRewards 62 confirmed in block: ${receipt.blockNumber}`);
+                        } catch (error) {
+                            console.error('handleGainRewards 63 Transaction failed', error);
+                            throw new ApiError(500, "Transaction failed");
+                        }
+                    }
+                    await sendTransaction();
+*/
+                    return res.json({
+                        success: true,
+                        data: "base reward processed",
+                    });
+                // Add more cases as needed
+                default:
+                    return res.status(400).json({
+                        success: false,
+                        error: "Invalid reward type",
+                    });
+            }
+        } catch (error) {
+            console.error("handleGainRewards error:", error);
+            return res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : "Internal server error",
+            });
+        }
     }
 
     /*async handleSolTransfer(req: express.Request, res: express.Response) {
