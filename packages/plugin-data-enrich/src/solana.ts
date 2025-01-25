@@ -21,9 +21,9 @@ export class InvalidPublicKeyError extends Error {
 }
 
 /**
- * 创建 Solana SOL 转账交易
- * @param params 转账参数
- * @returns Transaction 对象
+ * Create Solana SOL Transcation
+ * @param params trans input
+ * @returns Transaction output
  */
 export async function createSolTransferTransaction({
     fromPubkey,
@@ -35,7 +35,7 @@ export async function createSolTransferTransaction({
         "confirmed"
     );
 
-    // 验证并转换公钥
+    // Get Key
     let fromPublicKey: PublicKey;
     let toPublicKey: PublicKey;
 
@@ -50,15 +50,15 @@ export async function createSolTransferTransaction({
         throw new InvalidPublicKeyError("Invalid public key provided");
     }
 
-    // 验证金额
+    // Check Amount
     if (isNaN(solAmount) || solAmount <= 0) {
         throw new Error("Invalid SOL amount: must be a positive number");
     }
 
-    // 创建交易
+    // Create Transaction
     const transaction = new Transaction();
 
-    // 添加转账指令
+    // Add trans
     transaction.add(
         SystemProgram.transfer({
             fromPubkey: fromPublicKey,
@@ -67,10 +67,10 @@ export async function createSolTransferTransaction({
         })
     );
 
-    // 设置手续费支付账户
+    // Set gas address
     transaction.feePayer = fromPublicKey;
 
-    // 获取并设置最新区块哈希
+    // Get result
     const { blockhash } = await connection.getLatestBlockhash();
     transaction.recentBlockhash = blockhash;
 

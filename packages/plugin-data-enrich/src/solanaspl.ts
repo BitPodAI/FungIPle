@@ -21,11 +21,11 @@ export class InvalidPublicKeyError extends Error {
 }
 
 /**
- * 创建 ai16z Meme Coin 转账交易
- * @param params 转账参数
- * @returns Transaction 对象
+ * Create ai16z Meme Coin Transacation
+ * @param params Trans input
+ * @returns Transaction Output
  */
-export async function createTokenTransferTransaction({
+export async function createSolSplTransferTransaction({
     fromTokenAccountPubkey,
     toTokenAccountPubkey,
     ownerPubkey,
@@ -36,15 +36,15 @@ export async function createTokenTransferTransaction({
         "confirmed"
     );
 
-    // 验证并转换公钥
+    // Check the address
     const fromTokenAccount = new PublicKey(fromTokenAccountPubkey);
     const toTokenAccount = new PublicKey(toTokenAccountPubkey);
     const owner = new PublicKey(ownerPubkey);
 
-    // 创建交易
+    // Create Trans
     const transaction = new Transaction();
 
-    // 添加代币转账指令
+    // Add SPL
     transaction.add(
         createTransferInstruction(
             fromTokenAccount,
@@ -56,10 +56,10 @@ export async function createTokenTransferTransaction({
         )
     );
 
-    // 设置手续费支付账户
+    // Set Gas Address
     transaction.feePayer = owner;
 
-    // 获取并设置最新区块哈希
+    // Get Result
     const { blockhash } = await connection.getLatestBlockhash();
     transaction.recentBlockhash = blockhash;
 

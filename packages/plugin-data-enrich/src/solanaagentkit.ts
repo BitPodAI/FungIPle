@@ -4,7 +4,7 @@ import {
     PublicKey,
 } from "@solana/web3.js";
 import { SolanaAgentKit } from "solana-agent-kit";
-import { InvalidPublicKeyError } from "./solana";
+import { InvalidPublicKeyError } from "./solanaspl";
 
 const SOLANA_RPC_URL = clusterApiUrl("mainnet-beta");
 //const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";

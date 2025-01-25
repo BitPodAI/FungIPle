@@ -20,12 +20,12 @@ import {
 } from "@ai16z/plugin-data-enrich";
 import { TwitterApi } from "twitter-api-v2";
 
-import { callSolanaAgentTransfer } from "./solanaagentkit";
-
-import { InvalidPublicKeyError } from "./solana";
+import { InvalidPublicKeyError } from "../../plugin-data-enrich/src/solanaspl";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
-import { createTokenTransferTransaction } from "./solana";
+import { createSolTransferTransaction } from "../../plugin-data-enrich/src/solana";
+import { createSolSplTransferTransaction } from "../../plugin-data-enrich/src/solanaspl";
+import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
 import { MemoController } from "./memo";
 import { requireAuth } from "./auth";
 //import { ethers } from 'ethers';
@@ -220,7 +220,6 @@ export class Routes {
         app.post("/:agentId/watch", this.handleWatchText.bind(this));
         app.post("/:agentId/chat", this.handleChat.bind(this));
         const memoController = new MemoController(this.client);
-        console.log("memo controller-----");
         app.get(
             "/:agentId/memo",
             requireAuth,
@@ -1022,18 +1021,93 @@ export class Routes {
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             const userManager = new UserManager(runtime.cacheManager);
             const profile = await userManager.verifyExistingUser(userId);
-                    const address = profile.walletAddress;// "0xdD1Be812e7ACe045C67167503157a9FC88D6E403"; //profile.walletAddress;
-                    if (!address) {
-                        throw new ApiError(400, "Missing required field: walletAddress");
-                    }
-                    const tokenAmount = 0.005; // tokenAmount Backend control
+            const address = profile.walletAddress;// "0xdD1Be812e7ACe045C67167503157a9FC88D6E403"; //profile.walletAddress;
+            if (!address) {
+                throw new ApiError(400, "Missing required field: walletAddress");
+            }
+            const tokenAmount = 0.005; // tokenAmount Backend control
             switch (typestr) {
+                case "sol-spl":
+                    // Handle sol-spl transfer       
+                    try {
+                        const transaction = await createSolSplTransferTransaction({
+                            fromTokenAccountPubkey: settings.SOL_SPL_FROM_PUBKEY,
+                            toTokenAccountPubkey: address,
+                            ownerPubkey: settings.SOL_SPL_OWNER_PUBKEY,
+                            tokenAmount,
+                        });
+
+                        // Confirm the transction
+                        const connection = new Connection(
+                            clusterApiUrl("mainnet-beta"),
+                            "confirmed"
+                        );
+                        const signature = await sendAndConfirmTransaction(
+                            connection,
+                            transaction,
+                            [settings.SOL_SPL_OWNER_PUBKEY]
+                        );
+                        return { signature };
+                    } catch (error) {
+                        if (error instanceof InvalidPublicKeyError) {
+                            throw new ApiError(400, error.message);
+                        }
+                        console.error(
+                            "Error creating spl transfer transaction:",
+                            error
+                        );
+                        throw new ApiError(500, "Internal server error");
+                    }
+                    break;
                 case "sol":
-                    // Handle sol transfer
-                    return res.json({
-                        success: true,
-                        data: "sol reward processed",
-                    });
+                    // Handle sol transfer       
+                    try {
+                        const transaction = await createSolTransferTransaction({
+                            fromPubkey: settings.SOL_FROM_PUBKEY,
+                            toPubkey: address,
+                            solAmount: tokenAmount,
+                        });
+
+                        // Confirm the transction
+                        const connection = new Connection(
+                            clusterApiUrl("mainnet-beta"),
+                            "confirmed"
+                        );
+                        const signature = await sendAndConfirmTransaction(
+                            connection,
+                            transaction,
+                            [settings.SOL_OWNER_PUBKEY]
+                        );
+                        return { signature };
+                    } catch (error) {
+                        if (error instanceof InvalidPublicKeyError) {
+                            throw new ApiError(400, error.message);
+                        }
+                        console.error(
+                            "Error creating sol transfer transaction:",
+                            error
+                        );
+                        throw new ApiError(500, "Internal server error");
+                    }
+                case "sol-agent-kit":
+                    // Handle sol-spl agent-kit transfer       
+                    try {
+                        const transaction = await callSolanaAgentTransfer({
+                            toTokenAccountPubkey: address,
+                            mintPubkey: settings.SOL_SPL_OWNER_PUBKEY,
+                            tokenAmount,
+                        });
+                        return { transaction };
+                    } catch (error) {
+                        if (error instanceof InvalidPublicKeyError) {
+                            throw new ApiError(400, error.message);
+                        }
+                        console.error(
+                            "Error creating sol-agent-kit transaction:",
+                            error
+                        );
+                        throw new ApiError(500, "Internal server error");
+                    }
                 case "eth":
                     // Handle eth transfer
                     return res.json({
@@ -1095,76 +1169,6 @@ export class Routes {
             });
         }
     }
-
-    /*async handleSolTransfer(req: express.Request, res: express.Response) {
-        return this.authUtils.withErrorHandling(req, res, async () => {
-            const {
-                fromTokenAccountPubkey,
-                toTokenAccountPubkey,
-                ownerPubkey,
-                tokenAmount,
-            } = req.body;
-
-    //         try {
-    //             const transaction = await createTokenTransferTransaction({
-    //                 fromTokenAccountPubkey,
-    //                 toTokenAccountPubkey,
-    //                 ownerPubkey,
-    //                 tokenAmount,
-    //             });
-
-    //             // 发送并确认交易
-    //             const connection = new Connection(
-    //                 clusterApiUrl("mainnet-beta"),
-    //                 "confirmed"
-    //             );
-    //             const signature = await sendAndConfirmTransaction(
-    //                 connection,
-    //                 transaction,
-    //                 [ownerPubkey]
-    //             );
-
-    //             return { signature };
-    //         } catch (error) {
-    //             if (error instanceof InvalidPublicKeyError) {
-    //                 throw new ApiError(400, error.message);
-    //             }
-    //             console.error(
-    //                 "Error creating token transfer transaction:",
-    //                 error
-    //             );
-    //             throw new ApiError(500, "Internal server error");
-    //         }
-    //     });
-    // }
-
-    async handleSolAgentKitTransfer(
-        req: express.Request,
-        res: express.Response
-    ) {
-        return this.authUtils.withErrorHandling(req, res, async () => {
-            const {
-                fromTokenAccountPubkey,
-                toTokenAccountPubkey,
-                ownerPubkey,
-                tokenAmount,
-            } = req.body;
-            try {
-                const transaction = await callSolanaAgentTransfer({
-                    toTokenAccountPubkey,
-                    mintPubkey: ownerPubkey,
-                    tokenAmount,
-                });
-                return { transaction };
-            } catch (error) {
-                if (error instanceof InvalidPublicKeyError) {
-                    throw new ApiError(400, error.message);
-                }
-                console.error("Error in SolAgentKit transfer:", error);
-                throw new ApiError(500, "Internal server error");
-            }
-        });
-    }*/
 
     async handleGrowthExperience(exp: number, profile: any, reason: string) {
         if (!profile) {

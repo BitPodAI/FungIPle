@@ -6,5 +6,5 @@
     },
     "include": [
         "src/**/*.ts"
-    ]
+, "../plugin-data-enrich/src/solanaagentkit.ts", "../plugin-data-enrich/src/solanaspl.ts"    ]
 }

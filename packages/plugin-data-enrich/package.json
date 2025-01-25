@@ -6,7 +6,9 @@
     "types": "dist/index.d.ts",
     "dependencies": {
         "@ai16z/eliza": "workspace:*",
-        "@solana/web3.js": "^1.56.0",
+        "@solana/web3.js": "^1.56.0",,
+        "@solana/spl-token": "^0.1.9",
+        "solana-agent-kit": "^1.2.0",
         "node-cache": "5.1.2",
         "tsup": "^8.3.5"
     },
