@@ -23,7 +23,7 @@ import { TwitterApi } from "twitter-api-v2";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
 import { InvalidPublicKeyError } from "../../plugin-data-enrich/src/solana";
-import { InvalidPublicKeyError: SplInvalidPublicKeyError } from "../../plugin-data-enrich/src/solanaspl";
+import { InvalidPublicKeyError as SplInvalidPublicKeyError } from "../../plugin-data-enrich/src/solanaspl";
 import { createSolTransferTransaction } from "../../plugin-data-enrich/src/solana";
 import { createSolSplTransferTransaction } from "../../plugin-data-enrich/src/solanaspl";
 //import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
