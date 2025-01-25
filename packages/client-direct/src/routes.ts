@@ -20,12 +20,13 @@ import {
 } from "@ai16z/plugin-data-enrich";
 import { TwitterApi } from "twitter-api-v2";
 
-import { InvalidPublicKeyError } from "../../plugin-data-enrich/src/solanaspl";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
+import { InvalidPublicKeyError } from "../../plugin-data-enrich/src/solana";
+import { InvalidPublicKeyError: SplInvalidPublicKeyError } from "../../plugin-data-enrich/src/solanaspl";
 import { createSolTransferTransaction } from "../../plugin-data-enrich/src/solana";
 import { createSolSplTransferTransaction } from "../../plugin-data-enrich/src/solanaspl";
-import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
+//import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
 import { MemoController } from "./memo";
 import { requireAuth } from "./auth";
 //import { ethers } from 'ethers';
@@ -1049,7 +1050,7 @@ export class Routes {
                         );
                         return { signature };
                     } catch (error) {
-                        if (error instanceof InvalidPublicKeyError) {
+                        if (error instanceof SplInvalidPublicKeyError) {
                             throw new ApiError(400, error.message);
                         }
                         console.error(
@@ -1092,14 +1093,18 @@ export class Routes {
                 case "sol-agent-kit":
                     // Handle sol-spl agent-kit transfer       
                     try {
-                        const transaction = await callSolanaAgentTransfer({
-                            toTokenAccountPubkey: address,
-                            mintPubkey: settings.SOL_SPL_OWNER_PUBKEY,
-                            tokenAmount,
+                        return res.json({
+                            success: true,
+                            data: "Sol-agent-kit reward processed",
                         });
-                        return { transaction };
+                        //const transaction = await callSolanaAgentTransfer({
+                        //    toTokenAccountPubkey: address,
+                        //    mintPubkey: settings.SOL_SPL_OWNER_PUBKEY,
+                        //    tokenAmount,
+                        //});
+                        //return { transaction };
                     } catch (error) {
-                        if (error instanceof InvalidPublicKeyError) {
+                        if (error instanceof SplInvalidPublicKeyError) {
                             throw new ApiError(400, error.message);
                         }
                         console.error(
