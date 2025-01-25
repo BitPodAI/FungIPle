@@ -26,7 +26,7 @@ import { InvalidPublicKeyError } from "../../plugin-data-enrich/src/solana";
 import { InvalidPublicKeyError as SplInvalidPublicKeyError } from "../../plugin-data-enrich/src/solanaspl";
 import { createSolTransferTransaction } from "../../plugin-data-enrich/src/solana";
 import { createSolSplTransferTransaction } from "../../plugin-data-enrich/src/solanaspl";
-//import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
+import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
 import { MemoController } from "./memo";
 import { requireAuth } from "./auth";
 //import { ethers } from 'ethers';
@@ -1093,16 +1093,16 @@ export class Routes {
                 case "sol-agent-kit":
                     // Handle sol-spl agent-kit transfer       
                     try {
-                        return res.json({
-                            success: true,
-                            data: "Sol-agent-kit reward processed",
-                        });
-                        //const transaction = await callSolanaAgentTransfer({
-                        //    toTokenAccountPubkey: address,
-                        //    mintPubkey: settings.SOL_SPL_OWNER_PUBKEY,
-                        //    tokenAmount,
+                        //return res.json({
+                        //    success: true,
+                        //    data: "Sol-agent-kit reward processed",
                         //});
-                        //return { transaction };
+                        const transaction = await callSolanaAgentTransfer({
+                            toTokenAccountPubkey: address,
+                            mintPubkey: settings.SOL_SPL_OWNER_PUBKEY,
+                            tokenAmount,
+                        });
+                        return { transaction };
                     } catch (error) {
                         if (error instanceof SplInvalidPublicKeyError) {
                             throw new ApiError(400, error.message);
