@@ -1026,20 +1026,22 @@ export class Routes {
             if (!address) {
                 throw new ApiError(400, "Missing required field: walletAddress");
             }
-            const tokenAmount = 0.005; // tokenAmount Backend control
+            const tokenAmount = 1; // tokenAmount Backend control
             switch (typestr) {
                 case "sol-spl":
                     // Handle sol-spl transfer       
                     try {
-                        const transaction = await createSolSplTransferTransaction({
+                        const signature = await createSolSplTransferTransaction({
                             fromTokenAccountPubkey: settings.SOL_SPL_FROM_PUBKEY,
                             toTokenAccountPubkey: address,
                             ownerPubkey: settings.SOL_SPL_OWNER_PUBKEY,
                             tokenAmount,
                         });
+                        console.log(signature);
+                        return { signature };
 
                         // Confirm the transction
-                        const connection = new Connection(
+                        /*const connection = new Connection(
                             clusterApiUrl("mainnet-beta"),
                             "confirmed"
                         );
@@ -1048,7 +1050,7 @@ export class Routes {
                             transaction,
                             [settings.SOL_SPL_OWNER_PUBKEY]
                         );
-                        return { signature };
+                        return { signature };*/
                     } catch (error) {
                         if (error instanceof SplInvalidPublicKeyError) {
                             throw new ApiError(400, error.message);
