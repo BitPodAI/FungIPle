@@ -20,14 +20,16 @@ import {
 } from "@ai16z/plugin-data-enrich";
 import { TwitterApi } from "twitter-api-v2";
 
-import { callSolanaAgentTransfer } from "./solanaagentkit";
-
-import { InvalidPublicKeyError } from "./solana";
 import { Connection, clusterApiUrl } from "@solana/web3.js";
 import { sendAndConfirmTransaction } from "@solana/web3.js";
-import { createTokenTransferTransaction } from "./solana";
+import { InvalidPublicKeyError } from "../../plugin-data-enrich/src/solana";
+import { InvalidPublicKeyError as SplInvalidPublicKeyError } from "../../plugin-data-enrich/src/solanaspl";
+import { createSolTransferTransaction } from "../../plugin-data-enrich/src/solana";
+import { createSolSplTransferTransaction } from "../../plugin-data-enrich/src/solanaspl";
+import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
 import { MemoController } from "./memo";
 import { requireAuth } from "./auth";
+//import { ethers } from 'ethers';
 //import { requireAuth } from "./auth";
 
 interface TwitterCredentials {
@@ -219,7 +221,6 @@ export class Routes {
         app.post("/:agentId/watch", this.handleWatchText.bind(this));
         app.post("/:agentId/chat", this.handleChat.bind(this));
         const memoController = new MemoController(this.client);
-        console.log("memo controller-----");
         app.get(
             "/:agentId/memo",
             requireAuth,
@@ -235,6 +236,7 @@ export class Routes {
             requireAuth,
             memoController.handleDeleteMomo.bind(memoController)
         );
+        app.post("/:agentId/gain_rewards", this.handleGainRewards.bind(this));
 
         //app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
         //app.post("/:agentId/solkit_transfer",
@@ -555,14 +557,15 @@ export class Routes {
                 }
 
                 // Save userProfile
+                userProfile.tweetProfile.username = "";
                 userProfile.tweetProfile.code = "";
                 userProfile.tweetProfile.codeVerifier = "";
                 userProfile.tweetProfile.accessToken = "";
                 userProfile.tweetProfile.refreshToken = "";
                 await userManager.saveUserData(userProfile);
 
-                const data = await response.json();
-                console.log("Authorization revoked successfully:", data);
+                //const data = await response.json();
+                //console.log("Authorization revoked successfully:", data);
             } catch (err) {
                 console.error("Twitter auth revoke error:", err);
             }
@@ -654,10 +657,11 @@ export class Routes {
                 return profilesForDB;
             } catch (error) {
                 console.error("Profile search error:", error);
-                return res.status(500).json({
-                    success: false,
-                    error: "User search error",
-                });
+                //return res.status(500).json({
+                //    success: false,
+                //    error: "User search error",
+                //});
+                return [];
             }
         });
     }
@@ -839,82 +843,89 @@ export class Routes {
             if (!userId) {
                 throw new ApiError(400, "Missing required field: userId");
             }
+            try {
+                // Get user profile and credentials
+                const { runtime, profile } = await this.authUtils.validateRequest(
+                    req.params.agentId,
+                    userId
+                );
 
-            // Get user profile and credentials
-            const { runtime, profile } = await this.authUtils.validateRequest(
-                req.params.agentId,
-                userId
-            );
+                const {
+                    name = profile.agentname,
+                    roomId: customRoomId,
+                    prompt,
+                } = req.body;
 
-            const {
-                name = profile.agentname,
-                roomId: customRoomId,
-                prompt,
-            } = req.body;
+                // if (!prompt) {
+                //     throw new ApiError(400, "Missing required field: prompt");
+                // }
 
-            // if (!prompt) {
-            //     throw new ApiError(400, "Missing required field: prompt");
-            // }
+                const roomId = stringToUuid(
+                    customRoomId ??
+                        `default-room-${profile.userId}-${req.params.agentId}`
+                );
+                const newAgentId = stringToUuid(userId);
 
-            const roomId = stringToUuid(
-                customRoomId ??
-                    `default-room-${profile.userId}-${req.params.agentId}`
-            );
-            const newAgentId = stringToUuid(userId);
+                // Create agent config from user credentials
+                const agentConfig: AgentConfig = {
+                    ...profile,
+                    prompt,
+                    clients: ["twitter"],
+                    modelProvider: "redpill",
+                    bio: Array.isArray(profile.bio)
+                        ? profile.bio
+                        : [profile.bio || `I am ${name}`],
+                    style: profile.style || {
+                        all: [],
+                        chat: [],
+                        post: [],
+                    },
+                    adjectives: profile.adjectives || [],
+                    lore: profile.lore || [],
+                    knowledge: profile.knowledge || [],
+                    topics: profile.topics || [],
+                };
 
-            // Create agent config from user credentials
-            const agentConfig: AgentConfig = {
-                ...profile,
-                prompt,
-                clients: ["twitter"],
-                modelProvider: "redpill",
-                bio: Array.isArray(profile.bio)
-                    ? profile.bio
-                    : [profile.bio || `I am ${name}`],
-                style: profile.style || {
-                    all: [],
-                    chat: [],
-                    post: [],
-                },
-                adjectives: profile.adjectives || [],
-                lore: profile.lore || [],
-                knowledge: profile.knowledge || [],
-                topics: profile.topics || [],
-            };
+                // Ensure connection
+                await runtime.ensureConnection(
+                    userId,
+                    roomId,
+                    profile.userId,
+                    name,
+                    "direct"
+                );
 
-            // Ensure connection
-            await runtime.ensureConnection(
-                userId,
-                roomId,
-                profile.userId,
-                name,
-                "direct"
-            );
+                // Create memory
+                const messageId = stringToUuid(Date.now().toString());
+                const memory: Memory = {
+                    id: messageId,
+                    agentId: runtime.agentId,
+                    userId,
+                    roomId,
+                    content: {
+                        text: prompt,
+                        attachments: [],
+                        source: "direct",
+                        inReplyTo: undefined,
+                    },
+                    createdAt: Date.now(),
+                };
 
-            // Create memory
-            const messageId = stringToUuid(Date.now().toString());
-            const memory: Memory = {
-                id: messageId,
-                agentId: runtime.agentId,
-                userId,
-                roomId,
-                content: {
-                    text: prompt,
-                    attachments: [],
-                    source: "direct",
-                    inReplyTo: undefined,
-                },
-                createdAt: Date.now(),
-            };
+                await runtime.messageManager.createMemory(memory);
 
-            await runtime.messageManager.createMemory(memory);
+                // Register callback if provided
+                //if (this.client.registerCallbackFn) {
+                //    await this.client.registerCallbackFn(agentConfig, memory);
+                //}
 
-            // Register callback if provided
-            if (this.client.registerCallbackFn) {
-                await this.client.registerCallbackFn(agentConfig, memory);
+                return { profile, agentId: newAgentId };
+            } catch (error) {
+                console.error("Create Agent error:", error);
+                return res.status(500).json({
+                    success: false,
+                    error: "Internal server error",
+                });
             }
-
-            return { profile, agentId: newAgentId };
         });
     }
 
@@ -955,6 +966,13 @@ export class Routes {
                             watchlist,
                             cursor
                         );
+                    if (!report || report.items?.length === 0) {
+                        report =
+                            await InferMessageProvider.getAllWatchItemsPaginated(
+                                runtime.cacheManager,
+                                cursor
+                            );
+                    }
                 } else {
                     report =
                         await InferMessageProvider.getAllWatchItemsPaginated(
@@ -1005,75 +1023,167 @@ export class Routes {
         });
     }
 
-    /*async handleSolTransfer(req: express.Request, res: express.Response) {
-        return this.authUtils.withErrorHandling(req, res, async () => {
-            const {
-                fromTokenAccountPubkey,
-                toTokenAccountPubkey,
-                ownerPubkey,
-                tokenAmount,
-            } = req.body;
-
-    //         try {
-    //             const transaction = await createTokenTransferTransaction({
-    //                 fromTokenAccountPubkey,
-    //                 toTokenAccountPubkey,
-    //                 ownerPubkey,
-    //                 tokenAmount,
-    //             });
-
-    //             // 发送并确认交易
-    //             const connection = new Connection(
-    //                 clusterApiUrl("mainnet-beta"),
-    //                 "confirmed"
-    //             );
-    //             const signature = await sendAndConfirmTransaction(
-    //                 connection,
-    //                 transaction,
-    //                 [ownerPubkey]
-    //             );
-
-    //             return { signature };
-    //         } catch (error) {
-    //             if (error instanceof InvalidPublicKeyError) {
-    //                 throw new ApiError(400, error.message);
-    //             }
-    //             console.error(
-    //                 "Error creating token transfer transaction:",
-    //                 error
-    //             );
-    //             throw new ApiError(500, "Internal server error");
-    //         }
-    //     });
-    // }
-
-    async handleSolAgentKitTransfer(
-        req: express.Request,
-        res: express.Response
-    ) {
-        return this.authUtils.withErrorHandling(req, res, async () => {
-            const {
-                fromTokenAccountPubkey,
-                toTokenAccountPubkey,
-                ownerPubkey,
-                tokenAmount,
-            } = req.body;
-            try {
-                const transaction = await callSolanaAgentTransfer({
-                    toTokenAccountPubkey,
-                    mintPubkey: ownerPubkey,
-                    tokenAmount,
-                });
-                return { transaction };
-            } catch (error) {
-                if (error instanceof InvalidPublicKeyError) {
-                    throw new ApiError(400, error.message);
-                }
-                console.error("Error in SolAgentKit transfer:", error);
-                throw new ApiError(500, "Internal server error");
+    async handleGainRewards(req: express.Request, res: express.Response) {
+        try {
+            console.log("handleGainRewards 0");
+            const { typestr, userId } = req.body;
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const userManager = new UserManager(runtime.cacheManager);
+            const profile = await userManager.verifyExistingUser(userId);
+            const address = profile.walletAddress;// "0xdD1Be812e7ACe045C67167503157a9FC88D6E403"; //profile.walletAddress;
+            if (!address) {
+                throw new ApiError(400, "Missing required field: walletAddress");
             }
-        });
-    }*/
+            const tokenAmount = 1; // tokenAmount Backend control
+            switch (typestr) {
+                case "sol-spl":
+                    // Handle sol-spl transfer       
+                    try {
+                        const signature = await createSolSplTransferTransaction({
+                            fromTokenAccountPubkey: settings.SOL_SPL_FROM_PUBKEY,
+                            toTokenAccountPubkey: address,
+                            ownerPubkey: settings.SOL_SPL_OWNER_PUBKEY,
+                            tokenAmount,
+                        });
+                        console.log(signature);
+                        return { signature };
+
+                        // Confirm the transction
+                        /*const connection = new Connection(
+                            clusterApiUrl("mainnet-beta"),
+                            "confirmed"
+                        );
+                        const signature = await sendAndConfirmTransaction(
+                            connection,
+                            transaction,
+                            [settings.SOL_SPL_OWNER_PUBKEY]
+                        );
+                        return { signature };*/
+                    } catch (error) {
+                        if (error instanceof SplInvalidPublicKeyError) {
+                            throw new ApiError(400, error.message);
+                        }
+                        console.error(
+                            "Error creating spl transfer transaction:",
+                            error
+                        );
+                        throw new ApiError(500, "Internal server error");
+                    }
+                    break;
+                case "sol":
+                    // Handle sol transfer       
+                    try {
+                        const transaction = await createSolTransferTransaction({
+                            fromPubkey: settings.SOL_FROM_PUBKEY,
+                            toPubkey: address,
+                            solAmount: tokenAmount,
+                        });
+
+                        // Confirm the transction
+                        const connection = new Connection(
+                            clusterApiUrl("mainnet-beta"),
+                            "confirmed"
+                        );
+                        const signature = await sendAndConfirmTransaction(
+                            connection,
+                            transaction,
+                            [settings.SOL_OWNER_PUBKEY]
+                        );
+                        return { signature };
+                    } catch (error) {
+                        if (error instanceof InvalidPublicKeyError) {
+                            throw new ApiError(400, error.message);
+                        }
+                        console.error(
+                            "Error creating sol transfer transaction:",
+                            error
+                        );
+                        throw new ApiError(500, "Internal server error");
+                    }
+                case "sol-agent-kit":
+                    // Handle sol-spl agent-kit transfer       
+                    try {
+                        //return res.json({
+                        //    success: true,
+                        //    data: "Sol-agent-kit reward processed",
+                        //});
+                        const transaction = await callSolanaAgentTransfer({
+                            toTokenAccountPubkey: address,
+                            mintPubkey: settings.SOL_SPL_OWNER_PUBKEY,
+                            tokenAmount,
+                        });
+                        return { transaction };
+                    } catch (error) {
+                        if (error instanceof SplInvalidPublicKeyError) {
+                            throw new ApiError(400, error.message);
+                        }
+                        console.error(
+                            "Error creating sol-agent-kit transaction:",
+                            error
+                        );
+                        throw new ApiError(500, "Internal server error");
+                    }
+                case "eth":
+                    // Handle eth transfer
+                    return res.json({
+                        success: true,
+                        data: "eth reward processed",
+                    });
+                case "base":
+                    // Handle base transfer
+                    console.log("handleGainRewards 1");
+                    // Connect to Ethereum node
+                    /** const provider = new ethers.JsonRpcProvider('https://rpc.sepolia.dev');
+                    // Set wallet's private key //
+                    const privateKey = 'e9705f404a61aafbdb094e80a3e446e36be1ebdd9f43b35b676a0b808320dcf8'; // Ensure this is stored securely
+                    const wallet = new ethers.Wallet(privateKey, provider);
+                    // Set transaction parameters
+                    const toAddress = address; // Use the provided wallet address
+                    const amountInEther = ethers.utils.formatEther(tokenAmount); // Convert tokenAmount to Ether
+                    console.log("handleGainRewards 5");
+
+                    async function sendTransaction() {
+                        const tx = {
+                            to: toAddress,
+                            value: ethers.utils.parseEther(amountInEther), // Convert ETH amount to wei
+                            gasLimit: 21000, // Default gas limit
+                            gasPrice: await provider.getGasPrice(), // Get current gas price
+                        };
+                        console.log("handleGainRewards 6");
+
+                        try {
+                            const transactionResponse = await wallet.sendTransaction(tx);
+                            console.log(`handleGainRewards 61 sent: ${transactionResponse.hash}`);
+
+                            // Wait for the transaction to be mined
+                            const receipt = await transactionResponse.wait();
+                            console.log(`handleGainRewards 62 confirmed in block: ${receipt.blockNumber}`);
+                        } catch (error) {
+                            console.error('handleGainRewards 63 Transaction failed', error);
+                            throw new ApiError(500, "Transaction failed");
+                        }
+                    }
+                    await sendTransaction();
+*/
+                    return res.json({
+                        success: true,
+                        data: "base reward processed",
+                    });
+                // Add more cases as needed
+                default:
+                    return res.status(400).json({
+                        success: false,
+                        error: "Invalid reward type",
+                    });
+            }
+        } catch (error) {
+            console.error("handleGainRewards error:", error);
+            return res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : "Internal server error",
+            });
+        }
+    }
 
     async handleGrowthExperience(exp: number, profile: any, reason: string) {
         if (!profile) {

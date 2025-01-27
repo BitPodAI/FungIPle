@@ -77,7 +77,8 @@ ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
 const TWEET_COUNT_PER_TIME = 20; //count related to timeline
-const TWEET_TIMELINE = 60 * 60 * 1; //timeline related to count
+const TWEET_TIMELINE = 60 * 15; //timeline related to count
+const TWITTER_COUNT_PER_TIME = 6; //timeline related to count
 const GEN_TOKEN_REPORT_DELAY = 1000 * TWEET_TIMELINE;
 const SEND_TWITTER_INTERNAL = 1000 * 60 * 60;
 
@@ -333,21 +334,58 @@ export class TwitterWatchClient {
         return profiles;
     }
 
+    // get the following list
+    async setFollowingChanged(username: string,
+        followingList: string[], preFollowingList: string[]) {
+        const changedList = followingList.filter(item => !preFollowingList.includes(item));
+        //console.log(changedList);
+        if (changedList && changedList.length > 0) {
+            //await this.inferMsgProvider.addFollowingChangeMessage(kol,
+            //    ` for changing about ${twProfile.followingCount - followingCount} new followings, please check.`)
+            const output = `[${changedList.map(item => `@${item}`).join(', ')}]`;
+            console.log(output);
+            await this.inferMsgProvider.addFollowingChangeMessage(username,
+                ` for changing ${changedList.length} new followings of ${output}.`);
+        }
+
+    }
+
     async fetchTokens() {
         let fetchedTokens = new Map();
 
         try {
             const currentTime = new Date();
-            const timeline =
-                Math.floor(currentTime.getTime() / 1000) -
-                TWEET_TIMELINE -
-                60 * 60 * 24;
+            //const timeline =
+            //    Math.floor(currentTime.getTime() / 1000) -
+            //    TWEET_TIMELINE -
+            //    60 * 60 * 24;
             const kolList = await this.getKolList();
             let index = 0;
             for (const kol of kolList) {
+                const { timestamp, tweetsCount, followingCount, followingList } = await this.userManager.getTwitterScrapData(kol);
+                const twProfile = await this.client.twitterClient.getProfile(kol);
+                let newFollowingList: string[] = [];
+                if (followingCount != 0 && followingCount < twProfile.followingCount) {
+                    //TODO: the delete of the followings
+                    // Get the change of followingCount
+                    const followings = await this.client.twitterClient.fetchProfileFollowing(twProfile.userId, 10);
+                    newFollowingList = followings.profiles.map(item => item.username);
+                    if (followingList.length > 0) {
+                        await this.setFollowingChanged(kol, newFollowingList, followingList);
+                    }
+                    await this.userManager.setTwitterScrapData(kol, timestamp,
+                        twProfile.tweetsCount, twProfile.followingCount, newFollowingList);
+                }
+                console.log(timestamp);
+                if (tweetsCount == twProfile.tweetsCount) {
+                    console.log(`Skip for ${kol}, ${tweetsCount} - ${twProfile.tweetsCount}`)
+                    continue; // TODO for tweet delete
+                }
+                console.log("fetching...");
+                let latestTimestamp = timestamp;
                 let kolTweets = [];
                 let tweets = [];
-                if (index++ < 20) {
+                if (index++ < TWITTER_COUNT_PER_TIME) {
                     tweets = await this.client.twitterClient.getTweetsAndReplies(
                         kol,
                         TWEET_COUNT_PER_TIME
@@ -360,7 +398,10 @@ export class TwitterWatchClient {
                 // Fetch and process tweetsss
                 try {
                     for await (const tweet of tweets) {
-                        if (tweet.timestamp < timeline) {
+                        if (tweet.timestamp > latestTimestamp) {
+                            latestTimestamp = tweet.timestamp;
+                        }
+                        if (tweet.timestamp <= timestamp) {
                             continue; // Skip the outdates.
                         }
                         kolTweets.push(tweet);
@@ -371,6 +412,8 @@ export class TwitterWatchClient {
                     continue;
                 }
                 console.log(kolTweets.length);
+                await this.userManager.setTwitterScrapData(kol, latestTimestamp,
+                    twProfile.tweetsCount, twProfile.followingCount, newFollowingList);
                 if (kolTweets.length < 1) {
                     continue;
                 }
@@ -486,16 +529,12 @@ export class TwitterWatchClient {
             if (cached) {
                 // Login with v2
                 const profile = JSON.parse(cached);
-                if (profile.tweetProfile.accessToken) {
-                    // New Twitter API v2 by access token
-                    const twitterClient = new TwitterApi(
-                        profile.tweetProfile.accessToken
+                if (profile && profile.tweetProfile.accessToken) {
+                    let twitterClient = await this.getTwitterClient(
+                        profile.tweetProfile.accessToken,
+                        profile.tweetProfile.refreshToken,
                     );
-
-                    // Check if the client is working
-                    const me = await twitterClient.v2.me();
-                    console.log("sendTweet in sending v2 auth Success: ", me.data);
-                    if (me.data) {
+                    if (twitterClient) {
                         const tweetResponse = await twitterClient.v2.tweet({
                             text: tweetDataText,
                         });
@@ -529,19 +568,55 @@ export class TwitterWatchClient {
         }
     }
 
+    // Get the TwitterAPI Client by accessToken or refreshToken
+    async getTwitterClient(accessToken: string, refreshToken: string): Promise<TwitterApi> {
+        console.log("Watcher getTwitterClinet");
+        try {
+            let twitterClient = null;
+            let me = null;
+            try {
+                // New Twitter API v2 by access token
+                twitterClient = new TwitterApi(accessToken);
+
+                // Check if the client is working
+                me = await twitterClient.v2.me();
+                console.log("sendTweet in sending v2 auth Success: ", me.data);
+            } catch (err) {
+                console.log(err);
+                console.log(err.code);
+                //refesh token
+                const clientRefresh = new TwitterApi({
+                    clientId: settings.TWITTER_CLIENT_ID,
+                    clientSecret: settings.TWITTER_CLIENT_SECRET,
+                    refreshToken
+                });
+                const { accessToken: newToken } = await clientRefresh.refreshOAuth2Token(
+                    refreshToken
+                );
+                if (!newToken) {
+                    console.error("refresh token error");
+                }
+                twitterClient = new TwitterApi(newToken);
+                me = await twitterClient.v2.me();
+            }
+            if (me && me.data) {
+                return twitterClient;
+            }
+        } catch (error) {
+            console.error("getTwitterClinet error: ", error);
+        }
+        return null;
+    }
+
     // Get Tweet by V2 per user
     async getTweetV2(kolname: string, count: number) {
         console.log("Watcher getTweetV2");
         try {
-            const accessToken = await this.userManager.getUserTwitterAccessTokenSequence();
-            if (accessToken) {
+            const { accessToken, refreshToken } = await this.userManager.getUserTwitterAccessTokenSequence();
+            if (accessToken && refreshToken) {
                 // New Twitter API v2 by access token
-                const twitterClient = new TwitterApi(accessToken);
-
-                // Check if the client is working
-                const me = await twitterClient.v2.me();
-                console.log("Watcher getTweetV2 auth Success: ", me.data);
-                if (me.data) {
+                const twitterClient = await this.getTwitterClient(accessToken, refreshToken);
+                if (twitterClient) {
                     const params = {
                         max_results: count, // 5-100
                         pagination_token: undefined,

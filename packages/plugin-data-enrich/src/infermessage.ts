@@ -71,7 +71,7 @@ export class InferMessageProvider {
         return `${KOL_WATCH_ITEMS}/${kol}`;
     }
 
-    // 新增 WatchItems 相关方法
+    // Add WatchItems
     async addInferMessage(kol: string, input: string) {
         try {
             input = input.replaceAll("```", "");
@@ -107,7 +107,7 @@ export class InferMessageProvider {
                         TokenAlphaReport.push(item);
                     }
 
-                    let tokenInfo = await this.enrichByWebSearch(item.token);
+                    let tokenInfo = "";//await this.enrichByWebSearch(item.token);
 
                     let alpha: WatchItem = {
                         kol: kol,
@@ -131,6 +131,28 @@ export class InferMessageProvider {
                 this.setCachedData(TOKEN_REPORT, TokenAlphaReport);
                 this.setCachedData(TOKEN_ALPHA_TEXT, TokenAlphaText);
             }
+        } catch (error) {
+            console.error("An error occurred in addMsg:", error);
+        }
+    }
+
+    // Add Following changes WatchItems
+    async addFollowingChangeMessage(kol: string, msg: string) {
+        try {
+            const kolItems: WatchItem[] = [];
+            let alpha: WatchItem = {
+                kol: kol,
+                token: "Following",
+                title: `@${kol} Following Changed`,
+                updatedAt: Date.now().toString(),
+                text: `@${kol} Following Changed ${msg}`,
+            };
+            kolItems.push(alpha);
+
+            await this.setCachedData(
+                InferMessageProvider.getKolWatchItemsKey(kol),
+                kolItems
+            );
         } catch (error) {
             console.error("An error occurred in addMsg:", error);
         }
@@ -165,8 +187,9 @@ export class InferMessageProvider {
             });
 
             if (!response.ok) {
-                console.log(response);
-                throw new Error(`HTTP error! status: ${response}`);
+                //console.log(response);
+                //throw new Error(`HTTP error! status: ${response}`);
+                return "";
             }
 
             const data = await response.json();
