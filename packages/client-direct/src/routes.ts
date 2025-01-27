@@ -557,6 +557,7 @@ export class Routes {
                 }
 
                 // Save userProfile
+                userProfile.tweetProfile.username = "";
                 userProfile.tweetProfile.code = "";
                 userProfile.tweetProfile.codeVerifier = "";
                 userProfile.tweetProfile.accessToken = "";
@@ -965,6 +966,13 @@ export class Routes {
                             watchlist,
                             cursor
                         );
+                    if (!report || report.items?.length === 0) {
+                        report =
+                            await InferMessageProvider.getAllWatchItemsPaginated(
+                                runtime.cacheManager,
+                                cursor
+                            );
+                    }
                 } else {
                     report =
                         await InferMessageProvider.getAllWatchItemsPaginated(
