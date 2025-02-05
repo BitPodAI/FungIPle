@@ -1040,12 +1040,12 @@ export class Routes {
                     // Handle sol-spl transfer       
                     try {
                         const signature = await createSolSplTransferTransaction({
-                            fromTokenAccountPubkey: settings.SOL_SPL_FROM_PUBKEY,
+                            //fromTokenAccountPubkey: settings.SOL_SPL_FROM_PUBKEY,
                             toTokenAccountPubkey: address,
-                            ownerPubkey: settings.SOL_SPL_OWNER_PUBKEY,
+                            //ownerPubkey: settings.SOL_SPL_OWNER_PUBKEY,
                             tokenAmount,
                         });
-                        console.log(signature);
+                        //console.log(signature);
                         return { signature };
 
                         // Confirm the transction
