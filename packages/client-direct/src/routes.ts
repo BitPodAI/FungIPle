@@ -1099,8 +1099,11 @@ export class Routes {
                             //ownerPubkey: settings.SOL_SPL_OWNER_PUBKEY,
                             tokenAmount,
                         });
-                        //console.log(signature);
-                        return { signature };
+                        return res.json({
+                            success: true,
+                            signature,
+                            data: "Sol-SPL reward processed",
+                        });
 
                         // Confirm the transction
                         /*const connection = new Connection(
@@ -1185,12 +1188,12 @@ export class Routes {
                     });
                 case "sui":
                     // Handle SUI transfer
-                    const signature = await transferSui({
-                        account: address,
-                        amount: tokenAmount,
+                    const signature = await transferSui(address,'1000');
+                    return res.json({
+                        success: true,
+                        signature,
+                        data: "SUI reward processed",
                     });
-                    //console.log(signature);
-                    return { signature };
                 case "base":
                     // Handle base transfer
                     console.log("handleGainRewards 1");
