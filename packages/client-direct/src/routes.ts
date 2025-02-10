@@ -1185,10 +1185,7 @@ export class Routes {
                     });
                 case "sui":
                     // Handle SUI transfer
-                    const signature = await transferSui({
-                        account: address,
-                        amount: tokenAmount,
-                    });
+                    const signature = await transferSui(address, "1");
                     //console.log(signature);
                     return { signature };
                 case "base":
