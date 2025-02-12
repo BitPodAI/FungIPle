@@ -8,18 +8,13 @@ interface WatchItem {
     tags: [];
 }
 
-interface WalletItem {
-    chain: string;
-    address: string;
-}
-
 export interface UserProfile {
     userId: string;
     gmail?: string;
     agentname: string;
     bio?: string | string[];
     walletAddress?: string;
-    wallets?: WalletItem[];
+    wallets?: Record<string, string>;
     level: number;
     experience: number;
     nextLevelExp: number;

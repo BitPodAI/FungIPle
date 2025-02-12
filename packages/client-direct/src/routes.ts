@@ -28,7 +28,9 @@ import { InvalidPublicKeyError as SplInvalidPublicKeyError } from "../../plugin-
 import { createSolTransferTransaction } from "../../plugin-data-enrich/src/solana";
 import { createSolSplTransferTransaction } from "../../plugin-data-enrich/src/solanaspl";
 import { callSolanaAgentTransfer } from "../../plugin-data-enrich/src/solanaagentkit";
+import { transferEthToken } from "../../plugin-data-enrich/src/eth";
 import { transferSui } from "../../plugin-data-enrich/src/sui";
+import { transferStarknetToken } from "../../plugin-data-enrich/src/starknet";
 import { MemoController } from "./memo";
 import { requireAuth } from "./auth";
 import { CoinAnalysisObj, KEY_BNB_CACHE_STR } from "../../client-twitter/src/sighter";
@@ -1084,7 +1086,14 @@ export class Routes {
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             const userManager = new UserManager(runtime.cacheManager);
             const profile = await userManager.verifyExistingUser(userId);
-            const address = profile.walletAddress;// "0xdD1Be812e7ACe045C67167503157a9FC88D6E403"; //profile.walletAddress;
+            //const address = profile.walletAddress;// "0xdD1Be812e7ACe045C67167503157a9FC88D6E403"; //profile.walletAddress;
+            let address = "";
+            if (profile && profile.wallets) {
+                address = profile.wallets[typestr];
+            }
+            if (!address) {
+                address = profile.walletAddress;
+            }
             if (!address) {
                 throw new ApiError(400, "Missing required field: walletAddress");
             }
@@ -1181,20 +1190,33 @@ export class Routes {
                         throw new ApiError(500, "Internal server error");
                     }
                 case "eth":
-                    // Handle eth transfer
-                    return res.json({
-                        success: true,
-                        data: "eth reward processed",
-                    });
-                case "sui":
-                    // Handle SUI transfer
-                    const signature = await transferSui(address,'1000');
+                case "bsc":
+                case "base":
+                case "mantle":
+                    // Handle eth and eth-compatible transfer
+                    const signature = await transferEthToken(address, '1000', typestr);
                     return res.json({
                         success: true,
                         signature,
+                        data: "ETH reward processed",
+                    });
+                case "sui":
+                    // Handle SUI transfer
+                    const suiHash = await transferSui(address, '1000');
+                    return res.json({
+                        success: true,
+                        signature: suiHash,
                         data: "SUI reward processed",
                     });
-                case "base":
+                case "starknet":
+                    // Handle Starknet transfer
+                    const snHash = await transferStarknetToken(address, '1000');
+                    return res.json({
+                        success: true,
+                        signature: snHash,
+                        data: "Starknet reward processed",
+                    });
+                case "base-test":
                     // Handle base transfer
                     console.log("handleGainRewards 1");
                     // Connect to Ethereum node
