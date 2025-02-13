@@ -32,4 +32,42 @@ interface TokenMillMarketCreationParameters {
     args: string;
 }
 
-export type { YakSwapQuote, TokenMillMarketCreationParameters };
+interface UserResponse {
+
+    id: string;
+    createdOn: string;
+    twitterId: string;
+    twitterHandle: string;
+    twitterName: string;
+    twitterPicture: string;
+    lastLoginTwitterPicture: string;
+    bannerUrl: string | null;
+    address: string;
+    addressBeforeDynamicMigration: string;
+    dynamicAddress: string;
+    ethereumAddress: string | null;
+    solanaAddress: string;
+    prevAddress: string;
+    addressConfirmed: boolean;
+    twitterDescription: string;
+    signedUp: boolean;
+    subscriptionCurrency: string;
+    subscriptionCurrencyAddress: string | null;
+    subscriptionPrice: string;
+    keyPrice: string;
+    lastKeyPrice: string;
+    threadCount: number;
+    followerCount: number;
+    followingsCount: number;
+    twitterFollowers: number;
+    subscriptionsEnabled: boolean;
+    userConfirmed: boolean;
+    twitterConfirmed: boolean;
+    flag: number;
+    ixHandle: string;
+    handle: string | null;
+    following: boolean | null;
+    follower: boolean | null;
+}
+
+export type { YakSwapQuote, TokenMillMarketCreationParameters, UserResponse };
