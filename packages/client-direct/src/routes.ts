@@ -1064,7 +1064,8 @@ export class Routes {
                 //const { cursor, watchlist } = req.body;
                 const { userId } = req.body;
                 const cursor = "";
-                const watchlist = userManager.getWatchList(userId);
+                const watchItemList = await userManager.getWatchList(userId);
+                const watchlist: string[] = watchItemList.map(user => user.username);
                 let report;
                 if (watchlist && watchlist.length > 0) {
                     report =
@@ -1079,6 +1080,14 @@ export class Routes {
                                 runtime.cacheManager,
                                 cursor
                             );
+                    }
+                    else if (report && report.items?.length < 10) {
+                        let newReport =
+                            await InferMessageProvider.getAllWatchItemsPaginated(
+                                runtime.cacheManager,
+                                cursor
+                            );
+                        report.push(...newReport);
                     }
                 } else {
                     report =
