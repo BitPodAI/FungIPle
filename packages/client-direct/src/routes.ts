@@ -1061,7 +1061,10 @@ export class Routes {
             userManager.saveUserData(profile);
 
             try {
-                const { cursor, watchlist } = req.body;
+                //const { cursor, watchlist } = req.body;
+                const { userId } = req.body;
+                const cursor = "";
+                const watchlist = userManager.getWatchList(userId);
                 let report;
                 if (watchlist && watchlist.length > 0) {
                     report =

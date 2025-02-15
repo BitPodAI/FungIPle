@@ -327,7 +327,7 @@ export class InferMessageProvider {
             };
         }
 
-        const PAGE_SIZE = 5;
+        const PAGE_SIZE = 30;
 
         // Initialize with first KOL's items
         let currentItemIndex = 0;
