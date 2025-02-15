@@ -144,7 +144,8 @@ export class UserManager implements UserManageInterface {
 
     async getAllWatchList(): Promise<string[]> {
         let watchList = new Set<string>();
-        for (const kol of TW_KOL_1) {
+        const defaultList = JSON.parse(settings.TW_KOL_LIST) || TW_KOL_1;
+        for (const kol of defaultList) {
             watchList.add(kol);
         }
         const avoidList = JSON.parse(settings.TW_WATCHER_AVOID_LIST) || [];
