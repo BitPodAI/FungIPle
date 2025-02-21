@@ -219,6 +219,14 @@ export class Routes {
             "/:agentId/twitter_profile_search",
             this.handleTwitterProfileSearch.bind(this)
         );
+        app.post(
+            "/:agentId/twitter_labels",
+            this.handleTwitterLabels.bind(this)
+        );
+        app.post(
+            "/:agentId/twitter_profile_kols",
+            this.handleTwitterProfileKols.bind(this)
+        );
         app.post("/:agentId/re_twitter", this.handleReTwitter.bind(this));
         app.post(
             "/:agentId/translate_text",
@@ -283,6 +291,14 @@ export class Routes {
             );
 
             const userManager = new UserManager(runtime.cacheManager);
+
+            const cacheProfile = await userManager.verifyExistingUser(userId);
+            if(cacheProfile) {
+                return {
+                    profile: cacheProfile,
+                };
+            }
+
             const userProfile = userManager.createDefaultProfile(userId, gmail);
             await userManager.saveUserData(userProfile);
 
@@ -324,6 +340,12 @@ export class Routes {
             );
 
             const userManager = new UserManager(runtime.cacheManager);
+            const cacheProfile = await userManager.verifyExistingUser(userId);
+            if(cacheProfile) {
+                return {
+                    profile: cacheProfile,
+                };
+            }
             const userProfile = userManager.createDefaultProfile(userId, email);
             await userManager.saveUserData(userProfile);
 
@@ -471,39 +493,12 @@ export class Routes {
                     <head>
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <title>FungIPle</title>
-                        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTczIiBoZWlnaHQ9IjE2MyIgdmlld0JveD0iMCAwIDE3MyAxNjMiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0wIDEwNi44OUgxOS4yMDM1TDE5LjIzMzYgNzcuNDYwOUgwLjAzMDA3NkwwIDEwNi44OVoiIGZpbGw9IiNGRjk5MDAiLz4KPHBhdGggZD0iTTE3Mi45NTIgMjkuNDI5NUwxNzIuOTY3IDE5LjcxNDlDMTcyLjk2NyA5LjUxOTA5IDE2My4yNjggMCAxNTIuODYyIDBIODMuNzkyMkg4MS43OTIxSDc0LjQzODZINzMuOTQyM1YwLjAxNTAzODFDNjAuMDQ3MiAwLjI0MDYwOSA1MC4wOTIxIDEwLjEzNTcgNTAuMDc3IDIzLjg1MDRMNTAuMDE2OSA3Ny40NjExSDI5LjU2NTJMMjkuNTM1MiAxMDYuODkxSDQ5Ljk4NjhMNDkuOTI2NyAxNjIuNjIySDgzLjY4NjlMODMuNzQ3MSAxMDYuODkxSDgzLjc3NzJIMTQ4LjUzMUMxNjIuNjgxIDEwNi44OTEgMTcyLjg3NyA5Ni45MDUzIDE3Mi44OTIgODMuMDQwMkwxNzIuOTM3IDQxLjQ2NzJIMTM5LjE3N0wxMzkuMTMyIDc3LjQ2MTFIODMuNzkyMlYyOS40Mjk1SDEzOS4xOTJIMTcyLjk1MloiIGZpbGw9IiNGRjk5MDAiLz4KPC9zdmc+Cg==">
-                        <style>
-                            body {
-                                margin: 0;
-                            }
-                            .container {
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                width: 100vw;
-                            }
-                            .ad_img {
-                                max-width: 1000px;
-                                width: 100%;
-                                height: auto;
-                            }
-                            @media only screen and (max-width: 670px) {
-                                .ad_img {
-                                    max-width: 660px;
-                                    width: 100%;
-                                    height: auto;
-                                }
-                            }
-                        </style>
+                        <title>Auth</title>
                     </head>
                     <body>
                         <div style="text-align: center; font-size: 20px; font-weight: bold;">
-                            <h1>FungIPle Agent</h1>
-                            <br>Login Success!<br>
+                            <br>Auth Success! Redirecting...<br>
                             <script type="text/javascript">
-                                console.log('window.opener');
-                                console.log(window.opener);
                                 function closeWindow() {
                                     console.log('closeWindow');
                                     try {
@@ -523,20 +518,13 @@ export class Routes {
                                         console.log(e);
                                     }
                                 }
+                                closeWindow();
                             </script>
                             <button style="text-align: center; width: 40%; height: 40px; font-size: 20px; background-color: #9F91ED; color: #ffffff; margin: 20px; border: none; border-radius: 10px;"
                                 onclick="closeWindow()">
                                 Click to Close</button>
                             <br>
                         </div>
-                        <div class="container">
-                            <img style="max-width: 40%; width: 40%; height: auto;" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTczIiBoZWlnaHQ9IjE2MyIgdmlld0JveD0iMCAwIDE3MyAxNjMiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0wIDEwNi44OUgxOS4yMDM1TDE5LjIzMzYgNzcuNDYwOUgwLjAzMDA3NkwwIDEwNi44OVoiIGZpbGw9IiNGRjk5MDAiLz4KPHBhdGggZD0iTTE3Mi45NTIgMjkuNDI5NUwxNzIuOTY3IDE5LjcxNDlDMTcyLjk2NyA5LjUxOTA5IDE2My4yNjggMCAxNTIuODYyIDBIODMuNzkyMkg4MS43OTIxSDc0LjQzODZINzMuOTQyM1YwLjAxNTAzODFDNjAuMDQ3MiAwLjI0MDYwOSA1MC4wOTIxIDEwLjEzNTcgNTAuMDc3IDIzLjg1MDRMNTAuMDE2OSA3Ny40NjExSDI5LjU2NTJMMjkuNTM1MiAxMDYuODkxSDQ5Ljk4NjhMNDkuOTI2NyAxNjIuNjIySDgzLjY4NjlMODMuNzQ3MSAxMDYuODkxSDgzLjc3NzJIMTQ4LjUzMUMxNjIuNjgxIDEwNi44OTEgMTcyLjg3NyA5Ni45MDUzIDE3Mi44OTIgODMuMDQwMkwxNzIuOTM3IDQxLjQ2NzJIMTM5LjE3N0wxMzkuMTMyIDc3LjQ2MTFIODMuNzkyMlYyOS40Mjk1SDEzOS4xOTJIMTcyLjk1MloiIGZpbGw9IiNGRjk5MDAiLz4KPC9zdmc+Cg==">
-                        </div>
-
-                        <div>
-                            <br>
-                        </div>
-
                     </body>
                 </html>`);
         } catch (error) {
@@ -635,7 +623,7 @@ export class Routes {
             });
         }
     }
-    
+
     async handleArenaQuery(req: express.Request, res: express.Response) {
         const kol = typeof req.query.username === 'string' ? req.query.username : '';
         const kolname = kol.trim();
@@ -770,6 +758,82 @@ export class Routes {
         });
     }
 
+    async handleTwitterLabels(
+        req: express.Request,
+        res: express.Response
+    ) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            console.log("handleTwitterLabels");
+            if (!Array.isArray(req.body.xnamelist)) {
+                return res.status(400).json({ error: 'param not a array' });
+            }
+            const receivedStrings = req.body.xnamelist;
+
+            // receivedStrings.forEach((str, index) => {
+            //     console.log(`getlabels string:  ${index + 1}: ${str}`);
+            // });
+
+            // const runtime = await this.authUtils.getRuntime(req.params.agentId);
+
+            try {
+                let profilesOutput = [];
+                const promise = new Promise((resolve, reject) => {
+                    // Listen
+                    twEventCenter.on('MSG_TWITTER_LABELS_RESP', (data) => {
+                        //console.log('Received Resp message:', data);
+                        resolve(data);
+                    });
+
+                    twEventCenter.emit('MSG_TWITTER_LABELS', { xuserlist: receivedStrings });
+                });
+
+                // wait for result
+                profilesOutput = await promise;
+                return profilesOutput;
+            } catch (error) {
+                console.error("handleTwitterLabels error:", error);
+                return [];
+            }
+        });
+    }
+
+    async handleTwitterProfileKols(
+        req: express.Request,
+        res: express.Response
+    ) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            // const { username, count, userId } = req.body;
+            const {userId } = req.body;
+            //const fetchCount = Math.min(20, count);
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            console.log("kols handleTwitterProfileKols" + userId);
+            if (!userId) {
+                console.error("userId is empty.");
+                return [];
+            }
+
+            try {
+                let profilesOutput = [];
+                const promise = new Promise((resolve, reject) => {
+                    twEventCenter.on('MSG_KOLS_TWITTER_PROFILE_RESP', (data) => {
+                        resolve(data);
+                    });
+
+                    // set request
+                    twEventCenter.emit('MSG_KOLS_TWITTER_PROFILE', { });
+                    //console.log("Send search request");
+                });
+
+                // wait for result
+                profilesOutput = await promise;
+                return profilesOutput;
+            } catch (error) {
+                console.error("Profile search error:", error);
+                return [];
+            }
+        });
+    }
+
     async handleReTwitter(req: express.Request, res: express.Response) {
         try {
             console.log("handleReTwitter");
@@ -791,22 +855,29 @@ export class Routes {
 
     async handleTranslateText(req: express.Request, res: express.Response) {
         try {
-            console.log("handleTranslateText 1");
-            const { text } = req.body;
-            console.log("handleTranslateText 2" + text);
+            const {languagecode, text } = req.body;
+            console.log("handleTranslateText, code: " + languagecode);
+            console.log("handleTranslateText, text: " + text);
+            if(!languagecode || languagecode === "en" || languagecode.includes("en-")) {
+                return res.json({
+                    success: true,
+                    data:  {"result": text},
+                });
+            }
+
 
             const runtime = await this.authUtils.getRuntime(req.params.agentId);
             const prompt =
-                'You are a helpful translator. If the following text is in English, please translate it into Chinese. If it is in another language, translate it into English; The returned result only includes the translated result,The JSON structure of the returned result is: {"result":""}. The text that needs to be translated starts with [Text]. [TEXT]: ' +
+                'You are a helpful translator. Please translate the following text into the language corresponding to this code: ' + languagecode + ', The returned result only includes the translated result,The JSON structure of the returned result is: {"result":""}, No need to use markdown syntax to modify JSON, just include JSON. The text that needs to be translated starts with [Text]. [TEXT]: ' +
                 text;
-            //console.log("handleTranslateText 3" + prompt);
+            //console.log("handleTranslateText " + prompt);
 
             const response = await generateText({
                 runtime: runtime,
                 context: prompt,
                 modelClass: ModelClass.SMALL,
             });
-            //console.log("handleTranslateText 4" + response);
+            //console.log("handleTranslateText " + response);
 
             if (!response) {
                 throw new Error("No response from generateText");
@@ -1061,7 +1132,11 @@ export class Routes {
             userManager.saveUserData(profile);
 
             try {
-                const { cursor, watchlist } = req.body;
+                //const { cursor, watchlist } = req.body;
+                const { userId } = req.body;
+                const cursor = "";
+                const watchItemList = await userManager.getWatchList(userId);
+                const watchlist: string[] = watchItemList.map(user => user.username);
                 let report;
                 if (watchlist && watchlist.length > 0) {
                     report =
@@ -1076,6 +1151,14 @@ export class Routes {
                                 runtime.cacheManager,
                                 cursor
                             );
+                    }
+                    else if (report && report.items?.length < 10) {
+                        let newReport =
+                            await InferMessageProvider.getAllWatchItemsPaginated(
+                                runtime.cacheManager,
+                                cursor
+                            );
+                        report.push(...newReport);
                     }
                 } else {
                     report =
@@ -1148,7 +1231,7 @@ export class Routes {
             const tokenAmount = 1; // tokenAmount Backend control
             switch (typestr) {
                 case "sol-spl":
-                    // Handle sol-spl transfer       
+                    // Handle sol-spl transfer
                     try {
                         const signature = await createSolSplTransferTransaction({
                             //fromTokenAccountPubkey: settings.SOL_SPL_FROM_PUBKEY,
@@ -1161,18 +1244,6 @@ export class Routes {
                             signature,
                             data: "Sol-SPL reward processed",
                         });
-
-                        // Confirm the transction
-                        /*const connection = new Connection(
-                            clusterApiUrl("mainnet-beta"),
-                            "confirmed"
-                        );
-                        const signature = await sendAndConfirmTransaction(
-                            connection,
-                            transaction,
-                            [settings.SOL_SPL_OWNER_PUBKEY]
-                        );
-                        return { signature };*/
                     } catch (error) {
                         if (error instanceof SplInvalidPublicKeyError) {
                             throw new ApiError(400, error.message);
@@ -1185,7 +1256,7 @@ export class Routes {
                     }
                     break;
                 case "sol":
-                    // Handle sol transfer       
+                    // Handle sol transfer
                     try {
                         const transaction = await createSolTransferTransaction({
                             fromPubkey: settings.SOL_FROM_PUBKEY,
@@ -1203,7 +1274,11 @@ export class Routes {
                             transaction,
                             [settings.SOL_OWNER_PUBKEY]
                         );
-                        return { signature };
+                        return res.json({
+                            success: true,
+                            signature,
+                            data: "Sol reward processed",
+                        });
                     } catch (error) {
                         if (error instanceof InvalidPublicKeyError) {
                             throw new ApiError(400, error.message);
@@ -1215,7 +1290,7 @@ export class Routes {
                         throw new ApiError(500, "Internal server error");
                     }
                 case "sol-agent-kit":
-                    // Handle sol-spl agent-kit transfer       
+                    // Handle sol-spl agent-kit transfer
                     try {
                         //return res.json({
                         //    success: true,
@@ -1226,7 +1301,11 @@ export class Routes {
                             mintPubkey: settings.SOL_SPL_OWNER_PUBKEY,
                             tokenAmount,
                         });
-                        return { transaction };
+                        return res.json({
+                            success: true,
+                            transaction,
+                            data: "Sol-Agent-Kit reward processed",
+                        });
                     } catch (error) {
                         if (error instanceof SplInvalidPublicKeyError) {
                             throw new ApiError(400, error.message);
