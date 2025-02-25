@@ -193,6 +193,7 @@ export class Routes {
 
     setupRoutes(app: express.Application): void {
         app.post("/:agentId/login", this.handleLogin.bind(this));
+        app.post("/:agentId/hello", this.handleHello.bind(this));
         app.post("/:agentId/guest_login", this.handleGuestLogin.bind(this));
         app.get(
             "/:agentId/twitter_oauth_init",
@@ -262,6 +263,35 @@ export class Routes {
         //app.post("/:agentId/transfer_sol", this.handleSolTransfer.bind(this));
         //app.post("/:agentId/solkit_transfer",
         //    this.handleSolAgentKitTransfer.bind(this));
+    }
+    async handleHello(req: express.Request, res: express.Response) {
+        return this.authUtils.withErrorHandling(req, res, async () => {
+            const {
+                systeminfo,
+            } = req.body;
+
+            if (!systeminfo) {
+                return {
+                    systeminfo: "Welcome to the new world",
+                };
+            }
+
+            const runtime = await this.authUtils.getRuntime(req.params.agentId);
+            const userManager = new UserManager(runtime.cacheManager);
+            if(systeminfo === "clear") {
+                await userManager.clearLogCache();
+                return {
+                    systeminfo: "clear",
+                };
+            }
+            if(systeminfo === "get") {
+                const str = await userManager.getLogCache();
+                return {
+                    systeminfo: str,
+                };
+            }
+
+        });
     }
 
     async handleLogin(req: express.Request, res: express.Response) {
