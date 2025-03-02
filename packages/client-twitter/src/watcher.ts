@@ -414,6 +414,7 @@ export class TwitterWatchClient {
                         .map(
                             (tweet) => `
                     From: ${tweet.name} (@${tweet.username})
+                    Tweet-ID: ${tweet.id}
                     Text: ${tweet.text}\n
                     Likes: ${tweet.likes}, Replies: ${tweet.replies}, Retweets: ${tweet.retweets},
                         `
@@ -429,7 +430,8 @@ export class TwitterWatchClient {
                     modelClass: ModelClass.LARGE,
                 });
                 //console.log("generateText for db, after: " + response);
-                await this.inferMsgProvider.addInferMessage(kol, response);
+                //await this.inferMsgProvider.addInferMessage(kol, response);
+                await this.inferMsgProvider.addWatchItem(kol, response);
             }
 
             // Consensus for All Nodes

@@ -25,6 +25,7 @@ interface WatchItem {
     title: string;
     updatedAt: string;
     text: string;
+    tweetId: string;
 }
 
 interface WatchItemsPage {
@@ -79,6 +80,55 @@ export class InferMessageProvider {
     }
 
     // Add WatchItems
+    async addWatchItem(kol: string, input: string) {
+        try {
+            input = input.replaceAll("```", "");
+            input = input.replace("json", "");
+            let jsonArray = JSON.parse(input);
+
+            if (jsonArray) {
+                TokenAlphaReport = [];
+                TokenAlphaText = [];
+
+                const kolItems: WatchItem[] = [];
+
+                for (const item of jsonArray) {
+                    //if (TOP_TOKENS.includes(item.token)) {
+                    //    continue;
+                    //}
+                    //console.log(item);
+                    this.setCachedData(item.token, { ...item });
+                    TokenAlphaReport.push(item);
+
+                    //let tokenInfo = "";//await this.enrichByWebSearch(item.token);
+                    let tokenInfo = await this.twProvider.getAISummary(item.token);
+
+                    let alpha: WatchItem = {
+                        kol: kol,
+                        token: item.token,
+                        //title: `${item.interact}, total ${item.count} times`,
+                        title: `${item.interact}`,
+                        updatedAt: Date.now().toString(),
+                        text: `${item.event}\r\n\r\n ${tokenInfo}`,
+                        tweetId: `https://x.com/${kol}/status/${item.tweet_id}`,
+                    };
+                    //console.log(alpha);
+                    kolItems.push(alpha);
+                }
+
+                await this.setCachedData(
+                    InferMessageProvider.getKolWatchItemsKey(kol),
+                    kolItems
+                );
+
+                this.setCachedData(TOKEN_REPORT, TokenAlphaReport);
+                this.setCachedData(TOKEN_ALPHA_TEXT, TokenAlphaText);
+            }
+        } catch (error) {
+            console.error("An error occurred in addWatchItem:", error);
+        }
+    }
+
     async addInferMessage(kol: string, input: string) {
         try {
             input = input.replaceAll("```", "");
@@ -124,6 +174,7 @@ export class InferMessageProvider {
                         title: `${item.interact}`,
                         updatedAt: Date.now().toString(),
                         text: `${item.token}: ${item.event}\r\n\r\n ${tokenInfo}`,
+                        tweetId: `https://x.com/${kol}/status/${item.tweet_id}`,
                     };
                     kolItems.push(alpha);
                 }
@@ -151,6 +202,7 @@ export class InferMessageProvider {
                 title: `@${kol} Following Changed`,
                 updatedAt: Date.now().toString(),
                 text: `@${kol} Following Changed ${msg}`,
+                tweetId: `https://x.com/${kol}/following`,
             };
             kolItems.push(alpha);
 
@@ -280,6 +332,7 @@ export class InferMessageProvider {
     ): Promise<WatchItem[]> {
         const _post_key = InferMessageProvider.getKolWatchItemsKey(kol);
         const key = `${InferMessageProvider.cacheKey}/${_post_key}`;
+        //console.log(`getWatchItem: ${key}, kol: ${kol}`);
         return (await cacheManager.get<WatchItem[]>(key)) || [];
     }
 
@@ -356,6 +409,7 @@ export class InferMessageProvider {
                 cacheManager,
                 kol
             );
+            //console.log(`getWatchItem Result: ${kolItems}, kol: ${kol}`);
             allItems.push(...kolItems);
         }
         console.log(`All: ${allItems.length}`);
