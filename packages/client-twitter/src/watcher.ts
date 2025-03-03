@@ -416,6 +416,7 @@ export class TwitterWatchClient {
                     From: ${tweet.name} (@${tweet.username})
                     Tweet-ID: ${tweet.id}
                     Text: ${tweet.text}\n
+                    isReply: ${tweet.isReply}, isRetweet: ${tweet.isRetweet},
                     Likes: ${tweet.likes}, Replies: ${tweet.replies}, Retweets: ${tweet.retweets},
                         `
                         )
