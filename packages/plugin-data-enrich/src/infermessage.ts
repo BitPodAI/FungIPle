@@ -57,7 +57,7 @@ export class InferMessageProvider {
             path.join(InferMessageProvider.cacheKey, key),
             data,
             {
-                expires: Date.now() + 24 * 60 * 60 * 1000 * 7, // a week
+                expires: Date.now() + 24 * 60 * 60 * 1000 * 30, // a month
             }
         );
     }

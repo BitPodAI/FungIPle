@@ -77,8 +77,8 @@ ${settings.AGENT_WATCHER_INSTRUCTION || WATCHER_INSTRUCTION}
 ` + watcherCompletionFooter;
 
 const TWEET_COUNT_PER_TIME = 20; //count related to timeline
-const TWEET_TIMELINE = 60 * 15; //timeline related to count
-const TWITTER_COUNT_PER_TIME = 6; //timeline related to count
+const TWEET_TIMELINE = 60 * 5; //timeline related to count
+const TWITTER_COUNT_PER_TIME = 10; //timeline related to count
 const GEN_TOKEN_REPORT_DELAY = 1000 * TWEET_TIMELINE;
 const SEND_TWITTER_INTERNAL = 1000 * 60 * 60;
 
