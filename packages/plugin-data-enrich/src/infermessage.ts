@@ -195,13 +195,23 @@ export class InferMessageProvider {
     // Add Following changes WatchItems
     async addFollowingChangeMessage(kol: string, msg: string) {
         try {
+            let firstInfo = "";
+            try {
+                const arr: string[] = JSON.parse(msg);
+                let first = arr[0].substring(1);
+                firstInfo = await this.twProvider.getAISummary(first);
+            }
+            catch (err) {
+                console.log(err);
+            }
+
             const kolItems: WatchItem[] = [];
             let alpha: WatchItem = {
                 kol: kol,
                 token: "Following",
                 title: `@${kol} Following Changed`,
                 updatedAt: Date.now().toString(),
-                text: `@${kol} Following Changed ${msg}`,
+                text: `@${kol} Following Add ${msg} \r\n${firstInfo}`,
                 tweetId: `https://x.com/${kol}/following`,
             };
             kolItems.push(alpha);
